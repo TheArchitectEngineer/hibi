@@ -191,9 +191,11 @@ test('outline nesting follows the cursor and sidebar view pins survive reload', 
   await views.click()
   assert.equal(
     await page.getByRole('menuitem').first().innerText(),
-    'Pin On this page',
+    'Pin On this page shortcut',
   )
-  await page.getByRole('menuitem', { name: /^pin on this page$/i }).click()
+  await page
+    .getByRole('menuitem', { name: /^pin on this page shortcut$/i })
+    .click()
   assert.deepEqual(
     await page.evaluate(() =>
       JSON.parse(localStorage.getItem('sidebar-pinned-views')),
