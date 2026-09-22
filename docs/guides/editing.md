@@ -1,6 +1,6 @@
 # Editing
 
-Start typing in a blank note, use **File → Open** to choose a document, or select a recent workspace from the welcome screen.
+Start typing in a blank note, choose **Open a file…** on the welcome screen, use **File → Open**, or select a recent workspace.
 
 ## Choose a view
 

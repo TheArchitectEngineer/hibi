@@ -2058,6 +2058,7 @@ function App() {
               mode={mode}
               busy={busy}
               onOpen={(id) => void openFolder(id)}
+              onOpenFile={() => void runCommand('open')}
               onDismiss={() => {
                 dismissWelcome()
                 window.document

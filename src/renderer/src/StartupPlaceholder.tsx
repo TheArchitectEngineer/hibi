@@ -8,12 +8,14 @@ export function StartupPlaceholder({
   mode,
   busy,
   onOpen,
+  onOpenFile,
   onDismiss,
 }: {
   recent: readonly RecentWorkspace[] | null
   mode: ViewMode
   busy: boolean
   onOpen: (id: string) => void
+  onOpenFile: () => void
   onDismiss: () => void
 }) {
   return (
@@ -43,9 +45,14 @@ export function StartupPlaceholder({
       ) : (
         <p>No recent workspaces yet.</p>
       )}
-      <Button variant="ghost" disabled={busy} onClick={onDismiss}>
-        Dismiss this screen
-      </Button>
+      <div className="startup-actions">
+        <Button variant="ghost" disabled={busy} onClick={onOpenFile}>
+          Open a file…
+        </Button>
+        <Button variant="ghost" disabled={busy} onClick={onDismiss}>
+          Dismiss this screen
+        </Button>
+      </div>
     </section>
   )
 }

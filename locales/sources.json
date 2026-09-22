@@ -2663,6 +2663,9 @@
   "d7459cc0930d": [
     "src/addons/typst/index.tsx"
   ],
+  "4237a78ff96c": [
+    "src/renderer/src/StartupPlaceholder.tsx"
+  ],
   "fd94cbb45d14": [
     "src/renderer/src/WorkspaceSidebar.tsx"
   ],
