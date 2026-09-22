@@ -911,6 +911,7 @@ function App() {
         : window.hibi.openWorkspace())
       if (next) {
         setWorkspace(next)
+        setRecentWorkspaces(await window.hibi.getRecentWorkspaces())
         selectSidebarView('workspace')
         setWorkspaceRename(null)
         setSidebarOpen(true)
@@ -1592,6 +1593,17 @@ function App() {
         },
       })),
     )
+
+    if (recentWorkspaces && !busy)
+      paletteCommands.push(
+        ...recentWorkspaces.map(({ id, path }) => ({
+          id: `workspace.recent.${id}`,
+          category: 'file' as const,
+          label: `Open recent workspace: ${path}`,
+          keywords: `workspace folder recent ${path}`,
+          run: () => void openFolder(id),
+        })),
+      )
 
     if (workspace && !busy) {
       const create = async (action: 'new-file' | 'new-folder', path = '') => {

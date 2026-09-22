@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
@@ -11,6 +11,12 @@ test('command palette, full-height settings, and local geist fonts', {
   timeout: 45000,
 }, async (t) => {
   const profile = await mkdtemp(join(tmpdir(), 'hibi-palette-'))
+  const recentWorkspace = join(profile, 'Palette workspace')
+  await mkdir(recentWorkspace)
+  await writeFile(
+    join(profile, 'recent-workspaces.json'),
+    JSON.stringify([recentWorkspace]),
+  )
   const app = await electron.launch({
     args: [resolve('.'), `--user-data-dir=${profile}`],
     colorScheme: null,
@@ -83,6 +89,19 @@ test('command palette, full-height settings, and local geist fonts', {
     await palette.locator('.command-label').first().textContent(),
     'Export workspace to HTML',
   )
+  await search.fill('palette workspace')
+  assert.equal(
+    await palette.locator('.command-label').first().textContent(),
+    `Open recent workspace: ${recentWorkspace}`,
+  )
+  await search.press('Enter')
+  await palette.waitFor({ state: 'hidden' })
+  await page.waitForFunction(
+    async (name) => (await window.hibi.getWorkspace())?.name === name,
+    'Palette workspace',
+  )
+  await clickMenu(app, 'Command palette')
+  await palette.waitFor()
   await search.fill('')
   const keyStyle = (element) => {
     const style = getComputedStyle(element)

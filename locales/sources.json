@@ -2712,6 +2712,9 @@
   "cb30b7d97617": [
     "src/main/local-diagnostics/runtime.ts"
   ],
+  "6d20b0d6686a": [
+    "src/renderer/src/main.tsx"
+  ],
   "ca381c1e76e6": [
     "src/shared/hotkeys.ts"
   ],
