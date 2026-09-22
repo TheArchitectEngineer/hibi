@@ -107,7 +107,7 @@ Bare integrity checks undo and redo through native engine history, then write th
 
 ## Read CI results
 
-The benchmarks workflow publishes results to CodSpeed for pull requests and `main`. It measures core CPU work and desktop elapsed time separately. Shared-runner desktop timings are noisy, so compare repeated results on the same runner configuration.
+The benchmarks workflow publishes simulated core CPU results to CodSpeed for pull requests and `main`. Run desktop benchmarks locally when measuring startup or interaction changes. CodSpeed walltime results require a stable macro runner; standard GitHub-hosted runners produce noisy comparisons and are not used for desktop measurements.
 
 Keep correctness tests alongside performance work. Faster startup is useful only when the editor accepts input and the workspace list is ready.
 
