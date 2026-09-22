@@ -13,7 +13,7 @@ import type {
 export function localRender(
   context: AddonContext,
   render: (source: string, documentId?: string) => string | Promise<string>,
-  css: string,
+  css: string | (() => string),
 ) {
   return async (
     source: string,
@@ -22,7 +22,7 @@ export function localRender(
     html: context.editor.isSyntaxEnabled('preview')
       ? await render(source, documentId)
       : `<pre>${source.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>`,
-    css,
+    css: typeof css === 'function' ? css() : css,
   })
 }
 
@@ -30,6 +30,7 @@ export function localRender(
 export function localPreview(
   context: AddonContext,
   render: (source: string, documentId?: string) => Promise<RenderedMarkdown>,
+  css?: () => string,
 ) {
   return function Preview({ value, document, toolbar }: DocumentPreviewProps) {
     const [result, setResult] = useState<RenderedMarkdown | null>(null)
@@ -72,7 +73,7 @@ export function localPreview(
               try {
                 await context.native.invoke('export', {
                   html: result.html,
-                  css: result.css,
+                  css: css?.() ?? result.css,
                   name: document.name,
                 })
               } catch (reason) {
