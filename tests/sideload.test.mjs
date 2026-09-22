@@ -196,7 +196,9 @@ test('sideloads reviewed packages disabled, discovers their settings/themes/comm
   const view = page.getByRole('complementary', { name: 'Fixture view' })
   await view.getByText('Fixture sidebar content', { exact: true }).waitFor()
   await page.getByRole('button', { name: /sidebar views/i }).click()
-  await page.getByRole('menuitem', { name: /^pin fixture view$/i }).click()
+  await page
+    .getByRole('menuitem', { name: /^pin fixture view shortcut$/i })
+    .click()
   assert.deepEqual(
     await page.evaluate(() =>
       JSON.parse(localStorage.getItem('sidebar-pinned-views')),
