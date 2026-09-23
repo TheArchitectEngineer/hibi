@@ -49,9 +49,17 @@ test('command palette, full-height settings, and local geist fonts', {
   )
   const origin = await marker.evaluate((el) => el.getBoundingClientRect().top)
   assert.ok(
-    await marker.evaluate(
-      (el) => Number.parseFloat(getComputedStyle(el).transitionDuration) > 0,
-    ),
+    await marker.evaluate((el) => {
+      const style = getComputedStyle(el)
+      const properties = style.transitionProperty
+        .split(',')
+        .map((part) => part.trim())
+      const durations = style.transitionDuration
+        .split(',')
+        .map(Number.parseFloat)
+      const transform = properties.indexOf('transform')
+      return transform >= 0 && durations[transform % durations.length] > 0
+    }),
   )
   await search.press('ArrowDown')
   await page.waitForFunction((origin) => {
