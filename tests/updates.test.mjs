@@ -40,7 +40,18 @@ const manifest = (broken = false) => ({
       ['darwin-x64', 'mac-x64.dmg'],
     ].map(([platform, suffix]) => [
       platform,
-      { name: `hibi-${version}-${suffix}`, sha512, size: bytes.length },
+      {
+        name: `hibi-${version}-${suffix}`,
+        sha512,
+        size: bytes.length,
+        ...(platform.startsWith('darwin-') && {
+          zip: {
+            name: `hibi-${version}-mac-${platform.slice(7)}.zip`,
+            sha512,
+            size: bytes.length,
+          },
+        }),
+      },
     ]),
   ),
 })
@@ -77,6 +88,14 @@ test('channels fail closed and nightly ordering uses numeric runs rather than co
         'darwin-x64': { ...manifest().assets['darwin-x64'], size: -1 },
       },
     },
+    {
+      assets: {
+        'darwin-x64': {
+          ...manifest().assets['darwin-x64'],
+          zip: { ...manifest().assets['darwin-x64'].zip, name: '../evil.zip' },
+        },
+      },
+    },
   ])
     assert.throws(() => updateRelease({ ...manifest(), ...patch }, 'nightly'))
   assert.ok(newerUpdate(version, '0.1.0-nightly.20260921.gfffffff.14.9'))
@@ -92,8 +111,10 @@ test('channels fail closed and nightly ordering uses numeric runs rather than co
 test('publication hashes real installers and keeps both feeds pinned to a complete classified release', async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'hibi-feed-'))
   t.after(() => rm(root, { recursive: true, force: true }))
-  for (const asset of Object.values(manifest().assets))
+  for (const asset of Object.values(manifest().assets)) {
     await writeFile(join(root, asset.name), bytes)
+    if (asset.zip) await writeFile(join(root, asset.zip.name), bytes)
+  }
   const reports = platforms.map((platform) => ({
     platform,
     sha: 'a'.repeat(40),
@@ -135,6 +156,20 @@ test('publication hashes real installers and keeps both feeds pinned to a comple
         { url: expected.assets[platform].name, sha512, size: bytes.length },
       ])
     }
+    const macFeed = parse(await readFile(join(root, 'latest-mac.yml'), 'utf8'))
+    assert.equal(macFeed.version, version)
+    assert.deepEqual(macFeed.files, [
+      {
+        url: expected.assets['darwin-x64'].zip.name,
+        sha512,
+        size: bytes.length,
+      },
+      {
+        url: expected.assets['darwin-arm64'].zip.name,
+        sha512,
+        size: bytes.length,
+      },
+    ])
   }
   await assert.rejects(
     updateFeed(
@@ -202,16 +237,21 @@ async function adapter(t, platform = 'darwin', arch = 'x64', packaged = true) {
             contents:
               path === 'electron'
                 ? `
-        export const state = { requests: [], events: [], quit: 0, opened: [], packaged: ${packaged}, version: '0.1.0', response: undefined, bytes: Buffer.from('a verified installer'), installs: 0, downloads: 0, listeners: {}, failInstall: false };
+        export const state = { requests: [], events: [], quit: 0, packaged: ${packaged}, version: '0.1.0', response: undefined, installs: 0, downloads: 0, listeners: {}, failInstall: false };
         export const app = { get isPackaged() { return state.packaged }, getPath: () => ${JSON.stringify(root)}, getVersion: () => state.version, quit: () => { state.quit++ } };
         export const BrowserWindow = { getAllWindows: () => [{ webContents: { send: (...args) => state.events.push(args) } }] };
-        export const net = { fetch: async (url) => { state.requests.push(url); if (state.wait) await state.wait; if (state.error) throw new Error('offline'); return url.endsWith('update.json') ? new Response(JSON.stringify(state.response), { status: state.http ?? 200 }) : new Response(state.bytes); } };
-        export const shell = { openPath: async (path) => { state.opened.push(path); return '' } };
+        export const net = { fetch: async (url) => { state.requests.push(url); if (state.wait) await state.wait; if (state.error) throw new Error('offline'); return new Response(JSON.stringify(state.response), { status: state.http ?? 200 }); } };
       `
                 : `
         import { state } from 'electron';
         const autoUpdater = { on: (event, callback) => { state.listeners[event] = callback }, setFeedURL: (feed) => { state.feed = feed },
-          checkForUpdates: async () => ({ isUpdateAvailable: true, updateInfo: { version: state.response.version, files: [ { ...state.response.assets[${JSON.stringify(`${platform}-${arch}`)}], url: state.response.assets[${JSON.stringify(`${platform}-${arch}`)}].name } ] } }),
+          checkForUpdates: async () => {
+            const assets = state.response.assets;
+            const selected = ${platform === 'darwin' ? "[assets['darwin-arm64'].zip, assets['darwin-x64'].zip]" : `[assets[${JSON.stringify(`${platform}-${arch}`)}]]`};
+            const files = selected.map((asset) => ({ url: asset.name, sha512: asset.sha512, size: asset.size }));
+            if (state.badMetadata) files[0].sha512 = 'wrong';
+            return { isUpdateAvailable: true, updateInfo: { version: state.response.version, files } };
+          },
           downloadUpdate: async () => { state.downloads++; state.listeners['download-progress']({ percent: 50 }); if(state.failDownload) throw new Error('download failed'); return ['/tmp/update']; },
           quitAndInstall: () => { if (state.failInstall) state.listeners.error(new Error('install failed')); else state.installs++ }
         }; state.client = autoUpdater; export default { autoUpdater };
@@ -227,27 +267,29 @@ async function adapter(t, platform = 'darwin', arch = 'x64', packaged = true) {
   return { ...manager, root }
 }
 
-test('mac downloads verified architecture-specific installers, rejects corruption, and persists channel choice', async (t) => {
+test('mac pins both signed ZIPs, installs after close confirmation, and persists channel choice', async (t) => {
   const manager = await adapter(t, 'darwin', 'arm64')
   const { mock } = manager
   assert.equal(manager.getUpdateState().channel, 'nightly-green')
   assert.equal((await manager.checkForUpdates()).status, 'available')
-  assert.match(mock.requests[0], /nightly-green\/update.json$/)
-  mock.bytes = Buffer.from('x'.repeat(bytes.length))
-  assert.equal((await manager.downloadUpdate()).status, 'error')
-  assert.match(manager.getUpdateState().message, /could not be verified/)
-  assert.ok(
-    !(await readdir(manager.root)).some((name) =>
-      name.startsWith('hibi-update-'),
-    ),
+  assert.equal(
+    manager.getUpdateState().message,
+    `An update is available: ${version}`,
   )
+  assert.match(mock.requests[0], /nightly-green\/update.json$/)
+  mock.badMetadata = true
+  assert.equal((await manager.downloadUpdate()).status, 'error')
+  assert.match(manager.getUpdateState().message, /metadata changed/)
+  assert.equal(mock.downloads, 0)
   await assert.rejects(manager.installUpdate(), /Download an update/)
-  mock.bytes = bytes
+  mock.badMetadata = false
   assert.equal((await manager.downloadUpdate()).status, 'downloaded')
-  assert.match(mock.requests.at(-1), /mac-arm64.dmg$/)
-  await manager.installUpdate()
-  assert.equal(await readFile(mock.opened[0], 'utf8'), bytes.toString())
-  assert.equal(mock.quit, 0)
+  assert.equal(
+    manager.getUpdateState().message,
+    `An update is available: ${version}`,
+  )
+  assert.match(mock.feed.url, new RegExp(`${tag}/$`))
+  assert.equal(mock.downloads, 1)
   await manager.setUpdateChannel('nightly')
   assert.equal(manager.getUpdateState().version, undefined)
   await assert.rejects(manager.installUpdate())
@@ -264,6 +306,23 @@ test('mac downloads verified architecture-specific installers, rejects corruptio
   assert.match(mock.requests.at(-1), /\/nightly\/update.json$/)
   await manager.setUpdateChannel('nightly-green')
   assert.equal((await manager.checkForUpdates()).status, 'error')
+
+  const install = await adapter(t, 'darwin', 'x64')
+  let failedInstall = 0
+  install.onUpdateInstallFailure(() => failedInstall++)
+  await install.checkForUpdates()
+  assert.equal((await install.downloadUpdate()).status, 'downloaded')
+  await install.installUpdate()
+  assert.equal(install.mock.quit, 1)
+  install.cancelUpdateInstall()
+  assert.equal(install.finishUpdateInstall(), undefined)
+  await install.installUpdate()
+  assert.equal(install.finishUpdateInstall(), true)
+  assert.equal(install.mock.installs, 1)
+  install.mock.listeners.error(new Error('late install failure'))
+  assert.equal(failedInstall, 1)
+  assert.equal(install.getUpdateState().status, 'error')
+  assert.equal((await install.downloadUpdate()).status, 'downloaded')
 })
 
 test('checks handle missing feeds, offline failures, concurrent actions, and installed versions without downgrading', async (t) => {
@@ -293,6 +352,57 @@ test('checks handle missing feeds, offline failures, concurrent actions, and ins
   development.startUpdateChecks()
   assert.equal((await development.checkForUpdates()).status, 'error')
   assert.equal(development.mock.requests.length, 0)
+})
+
+test('startup check choice persists and leaves six-hour checks enabled', async (t) => {
+  const manager = await adapter(t, 'win32')
+  assert.equal(manager.getUpdateState().checkOnStartup, true)
+  assert.throws(() => manager.setUpdateStartupCheck('false'), /startup/)
+  await manager.setUpdateStartupCheck(false)
+  assert.equal(manager.getUpdateState().checkOnStartup, false)
+  assert.equal(
+    JSON.parse(
+      await readFile(join(manager.root, 'update-startup-check.json'), 'utf8'),
+    ),
+    false,
+  )
+  await manager.loadUpdates()
+  assert.equal(manager.getUpdateState().checkOnStartup, false)
+
+  const scheduled = []
+  const originalTimeout = globalThis.setTimeout
+  const originalInterval = globalThis.setInterval
+  try {
+    globalThis.setTimeout = (callback, delay) => {
+      scheduled.push({ callback, delay })
+      return { unref() {} }
+    }
+    globalThis.setInterval = (callback, delay) => {
+      scheduled.push({ callback, delay })
+      return { unref() {} }
+    }
+    manager.startUpdateChecks()
+  } finally {
+    globalThis.setTimeout = originalTimeout
+    globalThis.setInterval = originalInterval
+  }
+  assert.deepEqual(
+    scheduled.map(({ delay }) => delay),
+    [15_000, 6 * 60 * 60 * 1000],
+  )
+  manager.mock.version = version
+  scheduled[0].callback()
+  assert.equal(manager.mock.requests.length, 0)
+  scheduled[1].callback()
+  await new Promise(setImmediate)
+  assert.equal(manager.mock.requests.length, 1)
+  assert.equal(manager.getUpdateState().status, 'idle')
+
+  await manager.setUpdateStartupCheck(true)
+  scheduled[0].callback()
+  await new Promise(setImmediate)
+  assert.equal(manager.mock.requests.length, 2)
+  assert.equal(manager.getUpdateState().checkOnStartup, true)
 })
 
 test('windows and linux pin downloads and install only after close confirmation; cancellation and errors keep protection', async (t) => {
@@ -348,6 +458,10 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       () => !document.querySelector('#update-channel').disabled,
     )
     assert.equal(await picker.inputValue(), expected)
+    const startup = page.getByRole('checkbox', {
+      name: 'Check for updates on startup',
+    })
+    assert.equal(await startup.isChecked(), expected === 'nightly-green')
     if (expected === 'nightly') {
       assert.deepEqual(errors, [])
       await app.close()
@@ -362,6 +476,18 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       page.evaluate(() => window.hibi.setUpdateChannel('https://evil.invalid')),
       /valid update channel/,
     )
+    await assert.rejects(
+      page.evaluate(() => window.hibi.setUpdateStartupCheck('false')),
+      /startup/,
+    )
+    await startup.uncheck()
+    await page.waitForFunction(
+      async () => !(await window.hibi.getUpdateState()).checkOnStartup,
+    )
+    await page.waitForFunction(
+      () => !document.querySelector('#update-startup-check').checked,
+    )
+    assert.equal(await startup.isChecked(), false)
     await picker.selectOption('nightly')
     await page.waitForFunction(
       async () => (await window.hibi.getUpdateState()).channel === 'nightly',
@@ -372,7 +498,7 @@ test('update settings expose both channels, persist choice, and fit narrow windo
         .isDisabled(),
       true,
     )
-    const showUpdate = (status, progress) =>
+    const showUpdate = (status, progress, broken = false) =>
       app.evaluate(
         ({ BrowserWindow }, update) => {
           BrowserWindow.getAllWindows()[0].webContents.send(
@@ -384,22 +510,54 @@ test('update settings expose both channels, persist choice, and fit narrow windo
           channel: 'nightly',
           status,
           supported: true,
-          manualInstall: true,
+          checkOnStartup: false,
           version,
-          broken: true,
+          broken,
           progress,
-          message:
-            'An update is available. Save and back up your documents before installing.',
+          message: `An update is available: ${version}`,
         },
       )
+    await showUpdate('available', 0)
+    assert.equal(
+      await page.locator('#install-update-description').textContent(),
+      `An update is available: ${version}`,
+    )
     await showUpdate('downloading', 50)
-    await page.getByRole('status').filter({ hasText: '50%' }).waitFor()
+    const download = page.getByRole('button', {
+      name: 'Downloading 50%',
+      exact: true,
+    })
+    await download.waitFor()
+    assert.equal(await download.isDisabled(), true)
+    assert.equal(
+      await download.evaluate((element) =>
+        getComputedStyle(element).backgroundImage.includes('50%'),
+      ),
+      true,
+    )
+    assert.equal(
+      await page.locator('#install-update-description').textContent(),
+      `An update is available: ${version}`,
+    )
     assert.equal(await picker.isDisabled(), true)
+    assert.equal(await startup.isDisabled(), true)
+    for (const width of [480, 1000]) {
+      await page.setViewportSize({ width, height: 760 })
+      await mkdir('test-results', { recursive: true })
+      await page.screenshot({
+        path: `test-results/update-downloading-${width}.png`,
+        animations: 'disabled',
+      })
+    }
+    await showUpdate('downloading', 75)
+    await page
+      .getByRole('button', { name: 'Downloading 75%', exact: true })
+      .waitFor()
     await showUpdate('downloaded', 100)
     await page
-      .getByRole('button', { name: 'Open installer', exact: true })
+      .getByRole('button', { name: 'Restart and install', exact: true })
       .waitFor()
-    await showUpdate('available', 0)
+    await showUpdate('available', 0, true)
     await page
       .getByRole('button', { name: 'Download update', exact: true })
       .waitFor()

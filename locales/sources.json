@@ -187,7 +187,7 @@
   "480347cad7e2": [
     "src/main/sideload.ts"
   ],
-  "8cec94394c0f": [
+  "521da6c33a93": [
     "src/main/updates.ts"
   ],
   "7809d2e43901": [
@@ -394,6 +394,9 @@
   "3cad12865151": [
     "src/main/updates.ts"
   ],
+  "716ca91b6062": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
   "2937cffb37ab": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
@@ -425,6 +428,9 @@
   "7346030400bf": [
     "src/addons/slash-commands/commands.ts",
     "src/renderer/src/FormattingToolbar.tsx"
+  ],
+  "27f07dbac4f2": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "1a9f084bf2db": [
     "src/main/document.ts"
@@ -573,6 +579,9 @@
   ],
   "57886749ce8a": [
     "src/addons/documentation/options.ts"
+  ],
+  "23d7c3da66d2": [
+    "src/main/updates.ts"
   ],
   "97ebc02f32f0": [
     "src/main/workspace-settings.ts"
@@ -809,9 +818,6 @@
   "a3ef55d8c922": [
     "src/main/links.ts"
   ],
-  "01648c5454ae": [
-    "src/main/updates.ts"
-  ],
   "a7887e68d52e": [
     "src/addons/documentation/ExportDialog.tsx"
   ],
@@ -844,9 +850,6 @@
   ],
   "5bb069eb3188": [
     "src/renderer/src/main.tsx"
-  ],
-  "56bc9cc28f97": [
-    "src/main/updates.ts"
   ],
   "92f776f168d2": [
     "src/renderer/src/main.tsx"
@@ -1162,9 +1165,6 @@
   "5dd4b9e997ee": [
     "src/main/updates.ts"
   ],
-  "dffe083d4d59": [
-    "src/main/updates.ts"
-  ],
   "4f494b22379b": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
@@ -1174,11 +1174,14 @@
   "f0b0738f75b8": [
     "src/addons/math/PackageSettings.tsx"
   ],
-  "b99a39070daf": [
-    "src/main/updates.ts"
+  "37b345555d7e": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "9c9c27064963": [
     "src/addons/math/PackageSettings.tsx"
+  ],
+  "7cdffb6338bf": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "ad23f434e670": [
     "src/main/media.ts"
@@ -1728,9 +1731,6 @@
   ],
   "cc05d3346ee5": [
     "src/main/workspace.ts"
-  ],
-  "0959de9e21ce": [
-    "src/renderer/src/UpdateSettings.tsx"
   ],
   "87c719d7d306": [
     "src/main/history.ts"
@@ -2703,9 +2703,6 @@
   "9fa7894a6b62": [
     "src/site/main.tsx"
   ],
-  "3503cf221e56": [
-    "src/renderer/src/UpdateSettings.tsx"
-  ],
   "cb30b7d97617": [
     "src/main/local-diagnostics/runtime.ts"
   ],
@@ -2724,9 +2721,6 @@
   ],
   "7bcc1921ca42": [
     "src/addons/discord-presence/rpc.ts"
-  ],
-  "5da69b322815": [
-    "src/main/updates.ts"
   ],
   "80cb8a06e27d": [
     "src/addons/git/native.ts"
@@ -3968,12 +3962,6 @@
   "bee50784d023": [
     "src/shared/document-edits.ts"
   ],
-  "d5233922e139": [
-    "src/main/updates.ts"
-  ],
-  "e832fd97f277": [
-    "src/main/updates.ts"
-  ],
   "2c9095034e70": [
     "src/shared/updates.ts"
   ],
@@ -3982,9 +3970,6 @@
   ],
   "00212361daf3": [
     "src/shared/updates.ts"
-  ],
-  "a7f5b261c62c": [
-    "src/main/updates.ts"
   ],
   "b22c9541adab": [
     "src/main/updates.ts"
@@ -4519,9 +4504,6 @@
   "3945c0a1fc3c": [
     "src/renderer/src/VersionHistory.tsx"
   ],
-  "562001872cce": [
-    "src/renderer/src/UpdateSettings.tsx"
-  ],
   "dcc839a4015c": [
     "src/main/index.ts"
   ],
@@ -4548,6 +4530,9 @@
   ],
   "a7d3310ed7a2": [
     "src/main/updates.ts"
+  ],
+  "25ef3db952a5": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "19734a1b58ca": [
     "src/renderer/src/SettingsScreen.tsx"

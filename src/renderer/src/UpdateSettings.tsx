@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { errorMessage } from '../../shared/errors'
 import type { UpdateChannel, UpdateState } from '../../shared/updates'
-import { Button, Select, SettingRow } from '../../ui/Controls'
+import { Button, Select, SettingRow, Toggle } from '../../ui/Controls'
 
 export function UpdateSettings() {
   const [state, setState] = useState<UpdateState | null>(null)
@@ -40,6 +40,8 @@ export function UpdateSettings() {
     !state ||
     state.status === 'checking' ||
     state.status === 'downloading'
+  const downloading = state?.status === 'downloading'
+  const progress = Math.max(0, Math.min(100, Math.floor(state?.progress ?? 0)))
   return (
     <>
       <h2>Updates</h2>
@@ -67,9 +69,27 @@ export function UpdateSettings() {
           </Select>
         </SettingRow>
         <SettingRow
+          id="update-startup-check"
+          label="Check for updates on startup"
+          description="When enabled, installed builds check shortly after Hibi opens. Six-hour checks continue either way."
+        >
+          <Toggle
+            id="update-startup-check"
+            checked={state?.checkOnStartup ?? true}
+            disabled={waiting}
+            onChange={(event) => {
+              const enabled = event.target.checked
+              setState((current) =>
+                current ? { ...current, checkOnStartup: enabled } : current,
+              )
+              void run(() => window.hibi.setUpdateStartupCheck(enabled))
+            }}
+          />
+        </SettingRow>
+        <SettingRow
           id="check-updates"
           label="Check for updates"
-          description="Hibi checks at startup and every six hours. Downloads start when you choose."
+          description="Checks every six hours. Downloads start when you choose."
         >
           <Button
             id="check-updates"
@@ -82,7 +102,7 @@ export function UpdateSettings() {
         </SettingRow>
         <SettingRow
           id="install-update"
-          label={state?.version ? `Version ${state.version}` : 'Update status'}
+          label="Update status"
           description={
             <span
               role={error || state?.status === 'error' ? 'alert' : 'status'}
@@ -90,31 +110,45 @@ export function UpdateSettings() {
               {error || state?.message || 'Loading update settings…'}
               {state?.broken &&
                 ' This nightly failed required checks and may be broken.'}
-              {state?.status === 'downloading' && ` ${state.progress ?? 0}%`}
             </span>
           }
         >
           {state?.version &&
-            (state.status === 'available' || state.status === 'error') && (
+            (state.status === 'available' ||
+              state.status === 'error' ||
+              downloading) && (
               <Button
                 id="install-update"
-                aria-label="Download update"
+                aria-label={
+                  downloading ? `Downloading ${progress}%` : 'Download update'
+                }
+                className="update-download-button"
+                style={
+                  downloading
+                    ? ({
+                        '--download-progress': `${progress}%`,
+                      } as CSSProperties)
+                    : undefined
+                }
                 disabled={waiting}
                 onClick={() => void run(() => window.hibi.downloadUpdate())}
               >
-                Download update
+                {downloading ? `Downloading ${progress}%` : 'Download update'}
               </Button>
             )}
+          {downloading && (
+            <span className="update-progress-status" role="status">
+              Downloading {Math.floor(progress / 10) * 10}%
+            </span>
+          )}
           {state?.status === 'downloaded' && (
             <Button
               id="install-update"
-              aria-label={
-                state.manualInstall ? 'Open installer' : 'Restart and install'
-              }
+              aria-label="Restart and install"
               disabled={waiting}
               onClick={() => void run(() => window.hibi.installUpdate())}
             >
-              {state.manualInstall ? 'Open installer' : 'Restart and install'}
+              Restart and install
             </Button>
           )}
         </SettingRow>

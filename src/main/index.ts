@@ -119,7 +119,9 @@ import {
   getUpdateState,
   installUpdate,
   loadUpdates,
+  onUpdateInstallFailure,
   setUpdateChannel,
+  setUpdateStartupCheck,
   startUpdateChecks,
 } from './updates'
 import {
@@ -363,6 +365,10 @@ function createWindow(): void {
     }
   })
   let allowClose = false
+  onUpdateInstallFailure(() => {
+    allowClose = false
+    quitting = false
+  })
   let confirmingClose = false
   let rendererGone = false
   let journalReady = false
@@ -469,6 +475,7 @@ function createWindow(): void {
     else window.show()
   })
   window.on('closed', () => {
+    onUpdateInstallFailure()
     ipcMain.removeListener(DOCUMENT_CHANNELS.flushed, flushed)
     flushRequest?.reject(
       new Error('The editor closed before confirming its changes.'),
@@ -718,6 +725,11 @@ if (!app.requestSingleInstanceLock()) {
       handle(
         UPDATE_CHANNELS.channel,
         (_event, channel: unknown) => setUpdateChannel(channel),
+        updatesReady,
+      )
+      handle(
+        UPDATE_CHANNELS.startup,
+        (_event, enabled: unknown) => setUpdateStartupCheck(enabled),
         updatesReady,
       )
       handle(UPDATE_CHANNELS.check, checkForUpdates, updatesReady)

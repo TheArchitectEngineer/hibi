@@ -74,6 +74,9 @@ export type DesktopApi = {
   setUpdateChannel: (
     channel: import('./updates').UpdateChannel,
   ) => Promise<import('./updates').UpdateState>
+  setUpdateStartupCheck: (
+    enabled: boolean,
+  ) => Promise<import('./updates').UpdateState>
   checkForUpdates: () => Promise<import('./updates').UpdateState>
   downloadUpdate: () => Promise<import('./updates').UpdateState>
   installUpdate: () => Promise<void>

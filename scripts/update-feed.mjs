@@ -14,6 +14,15 @@ export async function updateFeed(release, directory) {
     throw new Error('Update metadata must match the classified release')
   const names = await readdir(directory)
   const assets = {}
+  const hashAsset = async (name) => {
+    const hash = createHash('sha512')
+    let size = 0
+    for await (const chunk of createReadStream(resolve(directory, name))) {
+      hash.update(chunk)
+      size += chunk.length
+    }
+    return { name, sha512: hash.digest('base64'), size }
+  }
   for (const [platform, suffix] of [
     ['win32-x64', '-win-x64.exe'],
     ['linux-x64', '.AppImage'],
@@ -34,13 +43,13 @@ export async function updateFeed(release, directory) {
         : source
     if (name !== source)
       await rename(resolve(directory, source), resolve(directory, name))
-    const hash = createHash('sha512')
-    let size = 0
-    for await (const chunk of createReadStream(resolve(directory, name))) {
-      hash.update(chunk)
-      size += chunk.length
+    assets[platform] = await hashAsset(name)
+    if (platform.startsWith('darwin-')) {
+      const zipName = `hibi-${release.version}-mac-${platform.slice(7)}.zip`
+      if (!names.includes(zipName))
+        throw new Error(`Missing updater ZIP: ${platform}`)
+      assets[platform].zip = await hashAsset(zipName)
     }
-    assets[platform] = { name, sha512: hash.digest('base64'), size }
   }
   const manifest = {
     tag: release.tag,
@@ -72,6 +81,22 @@ export async function updateFeed(release, directory) {
       ),
     )
   }
+  const macFiles = [assets['darwin-x64'].zip, assets['darwin-arm64'].zip].map(
+    (asset) => ({ url: asset.name, sha512: asset.sha512, size: asset.size }),
+  )
+  await writeFile(
+    resolve(directory, 'latest-mac.yml'),
+    JSON.stringify(
+      {
+        version: release.version,
+        files: macFiles,
+        path: macFiles[0].url,
+        sha512: macFiles[0].sha512,
+      },
+      null,
+      2,
+    ),
+  )
   return manifest
 }
 

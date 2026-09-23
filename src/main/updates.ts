@@ -1,10 +1,6 @@
-import { createHash } from 'node:crypto'
-import { createWriteStream } from 'node:fs'
-import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
-import { Readable, Transform } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
-import { app, BrowserWindow, net, shell } from 'electron'
+import { readFile, rename, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { app, BrowserWindow, net } from 'electron'
 import type { AppUpdater } from 'electron-updater'
 import { HISTORY_CHANNELS } from '../shared/history'
 import {
@@ -19,28 +15,36 @@ import {
 
 let state: UpdateState = {
   channel: 'nightly-green',
+  checkOnStartup: true,
   status: 'idle',
   supported: false,
-  manualInstall: process.platform === 'darwin',
   message: 'Updates are available in installed builds.',
 }
 let release: UpdateRelease | undefined
 let updater: AppUpdater | undefined
-let installer: string | undefined
 let installRequested = false
+let installing = false
+let installFailure: (() => void) | undefined
 let busy = false
 const unsupportedMessage =
   'Updates require an installed macOS or Windows build, or a running Linux AppImage.'
 const preferencePath = () =>
   join(app.getPath('userData'), 'update-channel.json')
+const startupPreferencePath = () =>
+  join(app.getPath('userData'), 'update-startup-check.json')
 export const getUpdateState = () => ({ ...state })
+export function onUpdateInstallFailure(callback?: () => void) {
+  installFailure = callback
+}
 
-async function clearInstaller() {
-  if (installer)
-    await rm(dirname(installer), { recursive: true, force: true }).catch(
-      () => {},
-    )
-  installer = undefined
+function failInstall() {
+  installRequested = false
+  installing = false
+  installFailure?.()
+  publish({
+    status: 'error',
+    message: 'Could not install the update. Download it again and retry.',
+  })
 }
 
 function publish(patch: Partial<UpdateState>) {
@@ -50,7 +54,7 @@ function publish(patch: Partial<UpdateState>) {
 }
 
 async function run(action: () => Promise<void>) {
-  if (busy || installRequested)
+  if (busy || installRequested || installing)
     throw new Error('Wait for the current update action to finish.')
   busy = true
   try {
@@ -77,6 +81,12 @@ export async function loadUpdates() {
   } catch {
     /* Missing or old preferences use the recommended channel. */
   }
+  try {
+    const saved = JSON.parse(await readFile(startupPreferencePath(), 'utf8'))
+    if (typeof saved === 'boolean') state.checkOnStartup = saved
+  } catch {
+    /* Missing preferences check on startup. */
+  }
   state.supported =
     app.isPackaged &&
     ((process.platform === 'darwin' &&
@@ -93,11 +103,30 @@ export async function loadUpdates() {
 export function startUpdateChecks() {
   if (!state.supported) return
   const check = () => {
-    if (!busy && !installRequested && ['idle', 'error'].includes(state.status))
+    if (
+      !busy &&
+      !installRequested &&
+      !installing &&
+      ['idle', 'error'].includes(state.status)
+    )
       void checkForUpdates().catch(() => {})
   }
-  setTimeout(check, 15_000).unref()
+  setTimeout(() => {
+    if (state.checkOnStartup) check()
+  }, 15_000).unref()
   setInterval(check, 6 * 60 * 60 * 1000).unref()
+}
+
+export function setUpdateStartupCheck(input: unknown) {
+  if (typeof input !== 'boolean')
+    throw new Error('Choose whether to check for updates on startup.')
+  return run(async () => {
+    await writeFile(`${startupPreferencePath()}.tmp`, JSON.stringify(input), {
+      mode: 0o600,
+    })
+    await rename(`${startupPreferencePath()}.tmp`, startupPreferencePath())
+    publish({ checkOnStartup: input })
+  })
 }
 
 export function setUpdateChannel(input: unknown) {
@@ -107,7 +136,6 @@ export function setUpdateChannel(input: unknown) {
       mode: 0o600,
     })
     await rename(`${preferencePath()}.tmp`, preferencePath())
-    await clearInstaller()
     release = undefined
     publish({
       channel,
@@ -129,7 +157,6 @@ export function checkForUpdates() {
         'Updates are available only in supported installed builds.',
       )
     release = undefined
-    await clearInstaller()
     publish({
       status: 'checking',
       version: undefined,
@@ -167,8 +194,7 @@ export function checkForUpdates() {
       status: 'available',
       version: candidate.version,
       broken: candidate.status === 'nightly-broken',
-      message:
-        'An update is available. Save and back up your documents before installing.',
+      message: `An update is available: ${candidate.version}`,
     })
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send(
@@ -187,11 +213,7 @@ async function desktopUpdater() {
     updater.allowPrerelease = true
     updater.disableDifferentialDownload = true
     updater.on('error', () => {
-      if (installRequested)
-        publish({
-          status: 'error',
-          message: 'Could not install the update. Download it again and retry.',
-        })
+      if (installRequested || installing) failInstall()
     })
     updater.on('download-progress', ({ percent }) =>
       publish({ progress: Math.floor(percent) }),
@@ -207,107 +229,72 @@ export function downloadUpdate() {
     publish({
       status: 'downloading',
       progress: 0,
-      message: 'Downloading update…',
+      message: `An update is available: ${release.version}`,
     })
     const base = `${UPDATE_URL}${release.tag}/`
-    if (state.manualInstall) {
-      const asset = release.assets[`${process.platform}-${process.arch}`]
-      if (!asset)
-        throw new Error('This update has no download for your system.')
-      const directory = await mkdtemp(join(app.getPath('temp'), 'hibi-update-'))
-      const destination = join(directory, asset.name)
-      try {
-        const response = await net.fetch(`${base}${asset.name}`, {
-          signal: AbortSignal.timeout(30 * 60_000),
-        })
-        if (!response.ok || !response.body)
-          throw new Error('Could not download the installer. Try again.')
-        const hash = createHash('sha512')
-        let received = 0
-        let progress = -1
-        await pipeline(
-          Readable.fromWeb(response.body as never),
-          new Transform({
-            transform(chunk, _encoding, callback) {
-              received += chunk.length
-              if (received > asset.size)
-                return callback(
-                  new Error('The update download has an unexpected size.'),
-                )
-              hash.update(chunk)
-              const next = Math.floor((received / asset.size) * 100)
-              if (next !== progress) {
-                progress = next
-                publish({ progress })
-              }
-              callback(null, chunk)
-            },
-          }),
-          createWriteStream(destination, { flags: 'wx', mode: 0o600 }),
-        )
-        if (received !== asset.size || hash.digest('base64') !== asset.sha512)
-          throw new Error(
-            'The update download could not be verified. Try downloading again.',
-          )
-        installer = destination
-      } catch (error) {
-        await rm(directory, { recursive: true, force: true })
-        throw error
-      }
-    } else {
-      const client = await desktopUpdater()
-      client.setFeedURL({
-        provider: 'generic',
-        url: base,
-        channel: 'latest',
-        useMultipleRangeRequest: false,
-      })
-      // Our run-number comparison already rejected older builds. Semver sorts Git hashes incorrectly.
-      client.allowDowngrade = true
-      const result = await client.checkForUpdates()
-      const asset = release.assets[`${process.platform}-${process.arch}`]
-      const files = result?.updateInfo.files
-      if (
-        !result?.isUpdateAvailable ||
-        result.updateInfo.version !== release.version ||
-        !asset ||
-        files?.length !== 1 ||
-        files[0]?.url !== asset.name ||
-        files[0]?.sha512 !== asset.sha512 ||
-        files[0]?.size !== asset.size
+    const client = await desktopUpdater()
+    client.setFeedURL({
+      provider: 'generic',
+      url: base,
+      channel: 'latest',
+      useMultipleRangeRequest: false,
+    })
+    // Our run-number comparison already rejected older builds. Semver sorts Git hashes incorrectly.
+    client.allowDowngrade = true
+    const result = await client.checkForUpdates()
+    const asset = release.assets[`${process.platform}-${process.arch}`]
+    const expected =
+      process.platform === 'darwin'
+        ? [
+            release.assets['darwin-arm64']?.zip,
+            release.assets['darwin-x64']?.zip,
+          ]
+        : [asset]
+    const files = result?.updateInfo.files
+    if (
+      !result?.isUpdateAvailable ||
+      result.updateInfo.version !== release.version ||
+      !asset ||
+      expected.some((file) => !file) ||
+      files?.length !== expected.length ||
+      !expected.every((file) =>
+        files.some(
+          (actual) =>
+            actual.url === file?.name &&
+            actual.sha512 === file.sha512 &&
+            actual.size === file.size,
+        ),
       )
-        throw new Error('The update metadata changed. Check for updates again.')
-      await client.downloadUpdate()
-    }
+    )
+      throw new Error('The update metadata changed. Check for updates again.')
+    await client.downloadUpdate()
     publish({
       status: 'downloaded',
       progress: 100,
-      message: state.manualInstall
-        ? 'Open the installer, quit Hibi, then drag Hibi into Applications to replace it.'
-        : 'The update is ready. Restart Hibi to install it.',
+      message: `An update is available: ${release.version}`,
     })
   })
 }
 
 export async function installUpdate() {
-  if (busy || installRequested || state.status !== 'downloaded')
+  if (busy || installRequested || installing || state.status !== 'downloaded')
     throw new Error('Download an update before installing.')
-  if (state.manualInstall) {
-    if (!installer) throw new Error('Download the installer again.')
-    const error = await shell.openPath(installer)
-    if (error) throw new Error('Could not open the installer. Try again.')
-  } else {
-    installRequested = true
-    app.quit()
-  }
+  installRequested = true
+  app.quit()
 }
 
 export function cancelUpdateInstall() {
   installRequested = false
 }
 export function finishUpdateInstall() {
+  if (installing) return true
   if (!installRequested || !updater) return undefined
-  updater.quitAndInstall(false, true)
   installRequested = false
+  installing = true
+  try {
+    updater.quitAndInstall(false, true)
+  } catch {
+    if (installing) failInstall()
+  }
   return state.status !== 'error'
 }
