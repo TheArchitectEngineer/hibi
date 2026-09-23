@@ -15,7 +15,7 @@ type ViewRegistration = {
     input?: unknown
     binding?: 'follow' | 'pinned'
     focus?: boolean
-    /** Override the sidebar's preferred side. Instances are independent on each side. */
+    /** Override the sidebar's preferred side. Ignored for panels and tabs. */
     side?: 'left' | 'right'
   }) => ViewInstance
   dispose: () => void
@@ -45,7 +45,7 @@ open: (options?: {
     input?: unknown
     binding?: 'follow' | 'pinned'
     focus?: boolean
-    /** Override the sidebar's preferred side. Instances are independent on each side. */
+    /** Override the sidebar's preferred side. Ignored for panels and tabs. */
     side?: 'left' | 'right'
   }) => ViewInstance
 ```

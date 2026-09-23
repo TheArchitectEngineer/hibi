@@ -54,7 +54,9 @@ import {
 } from './ActiveDocumentEditor'
 import { AddonPanel } from './AddonPanel'
 import { AddonSidebar, builtInViews, viewShortcut } from './AddonSidebar'
+import { AddonTab } from './AddonTab'
 import { addonRegistry } from './addon-registry'
+import { addonViews } from './addon-views'
 import { addons, useAddons } from './addons'
 import { useAutosave } from './autosave'
 import { CommandPalette, type PaletteCommand } from './CommandPalette'
@@ -106,6 +108,10 @@ const VersionHistory = lazy(() =>
   })),
 )
 function App() {
+  const addonViewState = useSyncExternalStore(
+    addonViews.subscribe,
+    addonViews.snapshot,
+  )
   const [settingsCategory, setSettingsCategory] = useState('hibi')
   const [settingTarget, setSettingTarget] = useState<string | null>(null)
   const registeredSettings = useSyncExternalStore(
@@ -219,6 +225,11 @@ function App() {
     editorDocument.publish(documentRuntime.get() ?? document)
   }, [document])
   const currentDocument = useRef(document)
+  const lastDocumentTab = useRef(document?.tabId)
+  useEffect(() => {
+    if (lastDocumentTab.current !== document?.tabId) addonViews.selectDocument()
+    lastDocumentTab.current = document?.tabId
+  }, [document?.tabId])
   const shellDocument = useRef(document)
   shellDocument.current = document
   currentDocument.current = documentRuntime.get() ?? document
@@ -542,6 +553,11 @@ function App() {
         if (sidebarOpen && !settingsOpen) closeSidebar(false)
         else setSidebarOpen(false)
       },
+      openTab: () => {
+        setZen(false)
+        setSettingsOpen(false)
+        showTitlebar()
+      },
       async focusDocument(tabId) {
         if (!currentDocument.current?.tabs.some((tab) => tab.id === tabId))
           return false
@@ -550,6 +566,7 @@ function App() {
             window.hibi.selectDocumentTab(tabId),
           )
         if (currentDocument.current?.tabId !== tabId) return false
+        addonViews.selectDocument()
         setSettingsOpen(false)
         requestAnimationFrame(() =>
           window.document
@@ -642,6 +659,16 @@ function App() {
     ...builtInViews,
     ...addonHost.sidebarViews.map(viewShortcut),
   ]
+  const addonTabs = useMemo(
+    () =>
+      addonViewState.instances.filter(
+        (entry) => entry.definition.location === 'tab',
+      ),
+    [addonViewState.instances],
+  )
+  const activeAddonTab = addonTabs.find(
+    (entry) => entry.id === addonViewState.activeTab,
+  )
   const activeAddonView = addonHost.sidebarViews.find(
     (view) => view.id === sidebarView,
   )
@@ -1155,7 +1182,8 @@ function App() {
     setPaletteOpen(false)
     switch (command) {
       case 'close-tab':
-        if (document)
+        if (activeAddonTab) activeAddonTab.handle.close()
+        else if (document)
           void applyDocumentOperation(() =>
             window.hibi.closeDocumentTab(document.tabId),
           )
@@ -1772,9 +1800,11 @@ function App() {
         onRightSidebarView={(view) =>
           selectSidebarView(view, undefined, 'right')
         }
-        onSelectTab={(id) =>
-          void applyDocumentOperation(() => window.hibi.selectDocumentTab(id))
-        }
+        onSelectTab={(id) => {
+          addonViews.selectDocument()
+          if (id !== document?.tabId)
+            void applyDocumentOperation(() => window.hibi.selectDocumentTab(id))
+        }}
         onCloseTab={(id) =>
           void applyDocumentOperation(() => window.hibi.closeDocumentTab(id))
         }
@@ -1782,6 +1812,14 @@ function App() {
           void applyDocumentOperation(() =>
             window.hibi.moveDocumentTab(id, beforeId),
           )
+        }
+        addonTabs={addonTabs}
+        activeAddonTab={activeAddonTab?.id ?? null}
+        onSelectAddonTab={(id) =>
+          addonTabs.find((tab) => tab.id === id)?.handle.show()
+        }
+        onCloseAddonTab={(id) =>
+          addonTabs.find((tab) => tab.id === id)?.handle.close()
         }
         sidebarOpen={settingsOpen ? settingsSidebarOpen : sidebarOpen}
         onSidebar={toggleSidebar}
@@ -1947,17 +1985,28 @@ function App() {
           (sidebarResize.overlay && (sidebarOpen || rightSidebarOpen) && !zen)
         }
       >
-        <EditorToolbar mode={mode} typing={typing} />
+        {!activeAddonTab && <EditorToolbar mode={mode} typing={typing} />}
         {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: tabpanel and region both support accessible names. */}
         <div
           className="editor-page"
           id="document-editor-panel"
-          role={document?.tabsEnabled === false ? 'region' : 'tabpanel'}
+          hidden={!!activeAddonTab}
+          role={
+            document?.tabsEnabled === false && addonTabs.length === 0
+              ? 'region'
+              : 'tabpanel'
+          }
           aria-label={
-            document?.tabsEnabled === false ? document.name : undefined
+            document?.tabsEnabled === false && addonTabs.length === 0
+              ? document.name
+              : undefined
           }
           aria-labelledby={
-            document?.tabsEnabled ? `document-tab-${document.tabId}` : undefined
+            document &&
+            (document.tabsEnabled || addonTabs.length > 0) &&
+            !activeAddonTab
+              ? `document-tab-${document.tabId}`
+              : undefined
           }
           data-startup={showWelcome}
           inert={!addonHost.ready}
@@ -2053,7 +2102,8 @@ function App() {
             />
           )}
         </div>
-        <AddonPanel hidden={settingsOpen || zen} />
+        <AddonTab hidden={settingsOpen} />
+        <AddonPanel hidden={settingsOpen || zen || !!activeAddonTab} />
       </div>
       {failed && (
         <p role="alert">

@@ -54,13 +54,14 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
     staged.hide();
     const follow = context.views.register({ id:'follow', label:'Following view', Content });
     const right = context.views.register({ id:'right', label:'Right session', side:'right', lifetime:'session', Content });
+    const tab = context.views.register({ id:'tab', label:'Fixture tab', location:'tab', lifetime:'session', Content });
     const queuedRight = right.open({id:'queued'});
     if (right.open({id:'queued'}) !== queuedRight) throw Error('right staged instance was not reused');
     queuedRight.hide();
     const lazy = React.lazy(() => new Promise(resolve => { window.finishView = () => resolve({default:Content}); }));
     const slow = context.views.register({ id:'slow', label:'Slow panel', location:'panel', Content:lazy });
     const broken = context.views.register({ id:'broken', label:'Broken panel', location:'panel', Content() { throw Error('view failure'); } });
-    window.viewsFixture = { context, panel, follow, right, queuedRight, slow, broken, staged, handles: {} };
+    window.viewsFixture = { context, panel, follow, right, tab, queuedRight, slow, broken, staged, handles: {} };
   }});`,
   )
   const app = await electron.launch({
@@ -183,6 +184,34 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
   )
   await page.evaluate(() => window.viewsFixture.queuedRight.show())
   await right.getByRole('button', { name: 'Count 1' }).waitFor()
+  await page.evaluate(() => {
+    const f = window.viewsFixture
+    f.handles.tab = f.tab.open({ id: 'dashboard' })
+  })
+  const addonTab = page.getByRole('tab', { name: 'Fixture tab' })
+  const tabContent = page.getByRole('tabpanel', { name: 'Fixture tab' })
+  await tabContent.getByRole('button', { name: 'Count 0' }).click()
+  assert.equal(await addonTab.getAttribute('aria-selected'), 'true')
+  assert.equal(await editor.isVisible(), false)
+  await page.locator(`#document-tab-${first}`).click()
+  assert.equal(await editor.isVisible(), true)
+  await addonTab.click()
+  await tabContent.getByRole('button', { name: 'Count 1' }).waitFor()
+  await addonTab.focus()
+  await page.keyboard.press('ArrowLeft')
+  assert.equal(await addonTab.getAttribute('aria-selected'), 'false')
+  await page.keyboard.press('End')
+  assert.equal(await addonTab.getAttribute('aria-selected'), 'true')
+  await clickMenu(app, 'Close tab')
+  await addonTab.waitFor({ state: 'detached' })
+  assert.equal(await editor.isVisible(), true)
+  await page.locator(`#document-tab-${first}`).click()
+  await page.evaluate(() => {
+    window.viewsFixture.handles.tab = window.viewsFixture.tab.open({
+      id: 'dashboard',
+    })
+  })
+  await tabContent.getByRole('button', { name: 'Count 0' }).waitFor()
   await clickMenu(app, 'Settings')
   await page.getByRole('tab', { name: 'Addons', exact: true }).click()
   await page.locator('#addon-view-fixture').click()
@@ -191,6 +220,7 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
   )
   await page.getByRole('button', { name: 'Back to app', exact: true }).click()
   assert.equal(await page.locator('[data-addon-view]').count(), 0)
+  assert.equal(await addonTab.count(), 0)
   assert.equal(await editor.textContent(), 'still editable')
   assert.equal(await sidebar.count(), 0)
   await page.getByText(/no view selected/i).waitFor()

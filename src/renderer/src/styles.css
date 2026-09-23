@@ -530,6 +530,16 @@ button:disabled {
   flex: 1;
   min-height: 0;
 }
+.editor-page[hidden],
+.addon-tab-panel[hidden] {
+  display: none;
+}
+.addon-tab-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .app[data-screen="settings"] .editor-surface {
   opacity: 0;
   visibility: hidden;

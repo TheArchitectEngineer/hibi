@@ -16,6 +16,7 @@ import { type Hotkeys, shortcutLabels } from '../../shared/hotkeys'
 import { IconButton } from '../../ui/Controls'
 import { useMenus } from '../../ui/MenuHost'
 import type { viewShortcut } from './AddonSidebar'
+import type { ViewEntry } from './addon-views'
 import { DocumentTabs } from './DocumentTabs'
 import type { ViewMode } from './Editor'
 
@@ -53,6 +54,10 @@ export function Titlebar({
   onSelectTab,
   onCloseTab,
   onMoveTab,
+  addonTabs,
+  activeAddonTab,
+  onSelectAddonTab,
+  onCloseAddonTab,
   busy,
 }: {
   document: DocumentState | null
@@ -77,6 +82,10 @@ export function Titlebar({
   onSelectTab: (id: string) => void
   onCloseTab: (id: string) => void
   onMoveTab: (id: string, beforeId: string | null) => void
+  addonTabs: ViewEntry[]
+  activeAddonTab: string | null
+  onSelectAddonTab: (id: string) => void
+  onCloseAddonTab: (id: string) => void
   busy: boolean
 }) {
   const menus = useMenus(console.error)
@@ -221,7 +230,7 @@ export function Titlebar({
         <div className="document-title">
           {settingsOpen ? (
             <span>Settings</span>
-          ) : document?.tabsEnabled === false ? (
+          ) : document?.tabsEnabled === false && addonTabs.length === 0 ? (
             <span
               className="single-document-title"
               data-tooltip={document.name}
@@ -245,12 +254,16 @@ export function Titlebar({
               onSelect={onSelectTab}
               onClose={onCloseTab}
               onMove={onMoveTab}
+              addonTabs={addonTabs}
+              activeAddonTab={activeAddonTab}
+              onSelectAddon={onSelectAddonTab}
+              onCloseAddon={onCloseAddonTab}
             />
           ) : (
             <span>Hibi</span>
           )}
         </div>
-        {!settingsOpen && (
+        {!settingsOpen && !activeAddonTab && (
           <nav className="view-switch" aria-label="Editor view">
             {(['normal', 'side-by-side', 'markdown'] as const).map((view) => {
               const label = view === 'markdown' ? 'Source view' : view
