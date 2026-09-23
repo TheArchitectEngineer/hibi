@@ -1296,7 +1296,9 @@ export function MarkdownEditor({
             return
           }
         } while (performance.now() - started < 2)
-        queue()
+        // Continue a started read on the next task; waiting for idle between
+        // every short slice makes large outlines stall on busy pages.
+        timer = setTimeout(read, 0)
       } catch (error) {
         work = null
         sourceOutline.current = null
