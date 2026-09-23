@@ -15,6 +15,9 @@ test('incremental checks select dependencies and fall back safely for cold, clea
     'tests/one.test.mjs': "import '../src/shared/one.ts'",
     'tests/two.test.mjs': "import '../src/shared/two.ts'",
     'tests/desktop.test.mjs': "import './electron.mjs'",
+    'tests/indirect.test.mjs': "import './desktop-helper.mjs'",
+    'tests/desktop-helper.mjs': "import './electron.mjs'",
+    'tests/browser.test.mjs': "import { chromium } from 'playwright'",
     'tests/electron.mjs': "import { _electron } from 'playwright'",
     'tests/io.test.mjs': "import { readFile } from 'node:fs/promises'",
     'tests/helper.mjs': "export { one } from '../src/shared/one.ts'",
@@ -34,8 +37,15 @@ test('incremental checks select dependencies and fall back safely for cold, clea
   const clean = plan([])
   assert.deepEqual(clean.tests, [])
   assert.equal(clean.build, false)
+  assert.deepEqual(plan([], { force: true }).unitTests, [
+    'tests/helper.test.mjs',
+    'tests/io.test.mjs',
+    'tests/one.test.mjs',
+    'tests/two.test.mjs',
+  ])
   const direct = plan(['tests/one.test.mjs'])
   assert.deepEqual(direct.tests, ['tests/one.test.mjs'])
+  assert.deepEqual(direct.unitTests, ['tests/one.test.mjs'])
   assert.equal(direct.build, false)
   assert.ok(
     plan(['tests/fixtures/image.png']).tests.includes('tests/io.test.mjs'),
@@ -45,10 +55,16 @@ test('incremental checks select dependencies and fall back safely for cold, clea
   assert.deepEqual(source.tests, [
     'tests/desktop.test.mjs',
     'tests/helper.test.mjs',
+    'tests/indirect.test.mjs',
     'tests/io.test.mjs',
     'tests/one.test.mjs',
   ])
   assert.equal(source.build, true)
+  assert.deepEqual(source.unitTests, [
+    'tests/helper.test.mjs',
+    'tests/io.test.mjs',
+    'tests/one.test.mjs',
+  ])
   assert.deepEqual(
     plan([], {
       previousTests: previousTests.filter(
@@ -80,11 +96,11 @@ test('incremental checks select dependencies and fall back safely for cold, clea
     cwd: root,
     stdio: 'pipe',
   })
-  assert.ok(
-    plan(['tests/helper.mjs'], {
-      previousTests: [...previousTests, 'tests/dynamic.test.mjs'],
-    }).tests.includes('tests/dynamic.test.mjs'),
-  )
+  const dynamic = plan(['tests/helper.mjs'], {
+    previousTests: [...previousTests, 'tests/dynamic.test.mjs'],
+  })
+  assert.ok(dynamic.tests.includes('tests/dynamic.test.mjs'))
+  assert.ok(!dynamic.unitTests.includes('tests/dynamic.test.mjs'))
   writeFileSync(join(root, 'src/shared/new.ts'), 'export const added = 3')
   const untracked = plan([])
   assert.equal(untracked.build, true)

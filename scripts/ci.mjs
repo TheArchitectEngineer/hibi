@@ -80,6 +80,9 @@ export function planChecks(
           /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]/g,
         ),
       ].map((match) => match[1])
+      const serial = imports.some((name) =>
+        /electron|playwright|worker_threads/.test(name),
+      )
       const readsFiles = /['"](?:node:)?fs(?:\/promises)?['"]/.test(source)
       let dynamic =
         /['"](?:node:)?child_process['"]/.test(source) ||
@@ -107,7 +110,7 @@ export function planChecks(
           if (!resolved) dynamic = true
           return resolved ? [resolved] : []
         })
-      modules.set(file, { local, dynamic, readsFiles })
+      modules.set(file, { local, dynamic, readsFiles, serial })
     }
     const module = modules.get(file)
     let { dynamic, readsFiles } = module
@@ -137,7 +140,13 @@ export function planChecks(
           (changes.size > 0 && graph.dynamic)
         )
       })
-  return { full, build, tests: selected, allTests: tests }
+  const unitTests = selected.filter((test) =>
+    [...dependencies(test).files].every((file) => {
+      const module = modules.get(file)
+      return module && !module.dynamic && !module.serial
+    }),
+  )
+  return { full, build, tests: selected, unitTests, allTests: tests }
 }
 
 function runCI() {
@@ -230,7 +239,13 @@ function runCI() {
       )
     npm('run', 'build:app')
   }
-  if (plan.tests.length) run(['--test', '--test-concurrency=1', ...plan.tests])
+  if (plan.unitTests.length)
+    run(['--test', '--test-concurrency=4', ...plan.unitTests])
+  const serialTests = plan.tests.filter(
+    (test) => !plan.unitTests.includes(test),
+  )
+  if (serialTests.length)
+    run(['--test', '--test-concurrency=1', ...serialTests])
   const sha = git(root, 'rev-parse', 'HEAD')
   // Never certify a dirty checkout as the committed revision.
   if (
