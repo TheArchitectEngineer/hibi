@@ -135,6 +135,24 @@ test('dependency settings discover addon requirements, manage shared paths, and 
     )
   }
   await checkSpacing()
+  await panel.locator('.dependency-list').waitFor()
+  assert.ok(
+    (await panel.locator('.dependency-list > section:not([hidden])').count()) >=
+      5,
+    'tools share one compact list',
+  )
+  assert.equal(await panel.locator('.dependency-group[open]').count(), 0)
+  const [toolRow, toolSummary] = await Promise.all([
+    panel
+      .locator('.dependency-list > section:not([hidden])')
+      .first()
+      .boundingBox(),
+    panel.locator('.dependency-list summary').first().boundingBox(),
+  ])
+  assert.ok(
+    Math.abs(toolRow.width - toolSummary.width) < 2,
+    'tool summary spans the full row',
+  )
   const filter = panel.getByRole('searchbox', {
     name: 'Filter dependencies',
     exact: true,
@@ -142,6 +160,7 @@ test('dependency settings discover addon requirements, manage shared paths, and 
   await filter.fill('fixture cli')
   let card = panel.getByRole('region', { name: 'Fixture CLI', exact: true })
   await card.getByText('Not found', { exact: true }).waitFor()
+  await card.locator('summary').click()
   await card.getByRole('link', { name: /installation guide/i }).click()
   assert.deepEqual(await app.evaluate(() => globalThis.dependencyUrls), [
     'https://example.com/install',
@@ -205,7 +224,7 @@ test('dependency settings discover addon requirements, manage shared paths, and 
   await filter.fill('pandoc')
   card = panel.getByRole('region', { name: 'Pandoc', exact: true })
   await card.waitFor()
-  await card.getByRole('heading', { name: 'Setup', exact: true }).waitFor()
+  await card.locator('summary').click()
   await card.getByRole('heading', { name: 'Used by', exact: true }).waitFor()
   const all = await page.evaluate(() => window.hibi.getDependencies())
   const pandoc = all.filter((tool) => tool.id === 'pandoc')

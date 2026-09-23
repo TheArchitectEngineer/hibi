@@ -1,6 +1,12 @@
-import { ExternalLink, Package, RefreshCw, Search } from 'lucide-react'
+import {
+  ChevronDown,
+  ExternalLink,
+  Package,
+  RefreshCw,
+  Search,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import type { Addon, AddonState } from '../../addons/api'
+import type { AddonState } from '../../addons/api'
 import type { DependencyState } from '../../shared/dependencies'
 import type { DesktopApi } from '../../shared/desktop'
 import { errorMessage } from '../../shared/errors'
@@ -9,7 +15,6 @@ import {
   IconButton,
   Panel,
   PanelMessage,
-  SettingRow,
   TextInput,
 } from '../../ui/Controls'
 import { useDialogs } from '../../ui/DialogProvider'
@@ -144,12 +149,10 @@ function DependencyPath({
 
 export function DependencySettings({
   active,
-  addons,
   states,
   openAddon,
 }: {
   active: boolean
-  addons: readonly Addon[]
   states: readonly AddonState[]
   openAddon: (id: string) => void
 }) {
@@ -219,8 +222,7 @@ export function DependencySettings({
       <header className="dependency-intro">
         <h1>Dependencies</h1>
         <p className="plugin-description">
-          Manage command-line tools used by your addons. Shared tools are listed
-          once, including requirements from disabled addons.
+          Tools requested by your addons, including disabled ones.
         </p>
       </header>
       <SettingsFilter
@@ -230,33 +232,19 @@ export function DependencySettings({
         value={query}
         onChange={setQuery}
       />
-      <div className="settings-group">
-        <SettingRow
-          id="check-dependencies"
-          label="Required tools"
-          description={
-            [
-              ...new Set(
-                addons.flatMap(
-                  (addon) =>
-                    addon.manifest.dependencies?.map((tool) => tool.name) ?? [],
-                ),
-              ),
-            ].join(', ') || 'Check availability and installed versions.'
+      <div className="dependency-toolbar">
+        <span>{tools ? `${tools.length} tools` : 'Tools'}</span>
+        <Button
+          disabled={waiting || !tools?.length}
+          onClick={() =>
+            void run('all', async () => {
+              for (const tool of tools ?? [])
+                await window.hibi.checkDependency(tool.key)
+            })
           }
         >
-          <Button
-            disabled={waiting || !tools?.length}
-            onClick={() =>
-              void run('all', async () => {
-                for (const tool of tools ?? [])
-                  await window.hibi.checkDependency(tool.key)
-              })
-            }
-          >
-            {busy === 'all' ? 'Checking…' : 'Check all'}
-          </Button>
-        </SettingRow>
+          {busy === 'all' ? 'Checking…' : 'Check all'}
+        </Button>
       </div>
       {error && (
         <DocumentNotice
@@ -268,114 +256,129 @@ export function DependencySettings({
       {!tools && !error && (
         <DocumentNotice title="Checking dependencies…" busy />
       )}
-      {tools?.map((tool) => (
-        <section
-          className="settings-group dependency-group"
-          key={tool.key}
-          aria-label={tool.name}
-          hidden={!matches(tool)}
+      {tools && (
+        <div
+          className="settings-group dependency-list"
+          hidden={!tools.some(matches)}
         >
-          <h2 className="dependency-section-label">Setup</h2>
-          <SettingRow
-            id={`dependency-${tool.key}`}
-            label={tool.name}
-            description={
-              <span className="dependency-setup-details">
-                <span data-verbatim="true">{tool.command}</span>
-                <a
-                  href={tool.homepage}
-                  onClick={(event) => {
-                    event.preventDefault()
-                    void run(tool.key, () =>
-                      window.hibi.openDependencyGuide(tool.key),
-                    )
-                  }}
-                >
-                  Installation guide <ExternalLink size={12} aria-hidden />
-                </a>
-              </span>
-            }
-          >
-            <span className="dependency-state" data-status={tool.status}>
-              {tool.status === 'installing'
-                ? 'Installing…'
-                : tool.status === 'available'
-                  ? 'Available'
-                  : tool.status === 'error'
-                    ? 'Needs attention'
-                    : 'Not found'}
-            </span>
-            {tool.status !== 'available' && tool.installer && (
-              <Button
-                disabled={waiting}
-                title={tool.installer.command}
-                onClick={() =>
-                  void run(tool.key, () =>
-                    window.hibi.installDependency(tool.key),
-                  )
-                }
-              >
-                Install with {tool.installer.manager}
-              </Button>
-            )}
-            <IconButton
-              aria-label={`Check ${tool.name}`}
-              disabled={waiting}
-              onClick={() =>
-                void run(tool.key, () => window.hibi.checkDependency(tool.key))
-              }
+          {tools.map((tool) => (
+            <section
+              key={tool.key}
+              aria-label={tool.name}
+              hidden={!matches(tool)}
             >
-              <RefreshCw size={15} />
-            </IconButton>
-          </SettingRow>
-          <div className="dependency-details">
-            <DependencyPath
-              tool={tool}
-              disabled={waiting}
-              configure={async (action) => {
-                setBusy(tool.key)
-                try {
-                  const next = await window.hibi.configureDependency(
-                    tool.key,
-                    action,
-                  )
-                  setTools(
-                    (tools) =>
-                      tools?.map((item) =>
-                        item.key === tool.key ? next : item,
-                      ) ?? null,
-                  )
-                  return next
-                } finally {
-                  setBusy(null)
-                }
-              }}
-            />
-            <h2 className="dependency-section-label">Used by</h2>
-            <ul
-              className="dependency-addons"
-              aria-label={`Addons using ${tool.name}`}
-            >
-              {tool.addons.map((addon) => (
-                <li key={addon.id}>
-                  <button
-                    type="button"
-                    className="dependency-addon-link"
-                    data-tooltip={addon.reason}
-                    onClick={() => openAddon(addon.id)}
-                  >
-                    {addon.name}
-                  </button>
-                  <span>
-                    {addon.optional ? 'Optional' : 'Required'}
-                    {!addon.enabled && ' · Addon disabled'}
+              <details className="dependency-group">
+                <summary>
+                  <span className="dependency-summary-copy">
+                    <strong>{tool.name}</strong>
+                    <span data-verbatim="true">
+                      {tool.command} · {tool.addons.length}{' '}
+                      {tool.addons.length === 1 ? 'addon' : 'addons'}
+                    </span>
                   </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      ))}
+                  <span className="dependency-state" data-status={tool.status}>
+                    {tool.status === 'installing'
+                      ? 'Installing…'
+                      : tool.status === 'available'
+                        ? 'Available'
+                        : tool.status === 'error'
+                          ? 'Needs attention'
+                          : 'Not found'}
+                  </span>
+                  <ChevronDown
+                    className="dependency-chevron"
+                    size={16}
+                    aria-hidden
+                  />
+                </summary>
+                <div className="dependency-details">
+                  <div className="dependency-actions">
+                    <a
+                      href={tool.homepage}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        void run(tool.key, () =>
+                          window.hibi.openDependencyGuide(tool.key),
+                        )
+                      }}
+                    >
+                      Installation guide <ExternalLink size={12} aria-hidden />
+                    </a>
+                    {tool.status !== 'available' && tool.installer && (
+                      <Button
+                        disabled={waiting}
+                        title={tool.installer.command}
+                        onClick={() =>
+                          void run(tool.key, () =>
+                            window.hibi.installDependency(tool.key),
+                          )
+                        }
+                      >
+                        Install with {tool.installer.manager}
+                      </Button>
+                    )}
+                    <IconButton
+                      aria-label={`Check ${tool.name}`}
+                      disabled={waiting}
+                      onClick={() =>
+                        void run(tool.key, () =>
+                          window.hibi.checkDependency(tool.key),
+                        )
+                      }
+                    >
+                      <RefreshCw size={15} />
+                    </IconButton>
+                  </div>
+                  <DependencyPath
+                    tool={tool}
+                    disabled={waiting}
+                    configure={async (action) => {
+                      setBusy(tool.key)
+                      try {
+                        const next = await window.hibi.configureDependency(
+                          tool.key,
+                          action,
+                        )
+                        setTools(
+                          (tools) =>
+                            tools?.map((item) =>
+                              item.key === tool.key ? next : item,
+                            ) ?? null,
+                        )
+                        return next
+                      } finally {
+                        setBusy(null)
+                      }
+                    }}
+                  />
+                  <h2 className="dependency-section-label">Used by</h2>
+                  <ul
+                    className="dependency-addons"
+                    aria-label={`Addons using ${tool.name}`}
+                  >
+                    {tool.addons.map((addon) => (
+                      <li key={addon.id}>
+                        <button
+                          type="button"
+                          className="dependency-addon-link"
+                          data-tooltip={addon.reason}
+                          onClick={() => openAddon(addon.id)}
+                        >
+                          {addon.name}
+                        </button>
+                        <span>
+                          {addon.optional ? 'Optional' : 'Required'}
+                          {!addon.enabled && ' · Addon disabled'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
+            </section>
+          ))}
+        </div>
+      )}
       {tools && !tools.some(matches) && (
         <Panel>
           <PanelMessage
