@@ -206,7 +206,12 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
     .locator(
       '[role="tab"][id^="document-tab-"][aria-selected="true"][aria-disabled="false"]',
     )
-    .focus()
+    .waitFor()
+  await page.waitForFunction(
+    () =>
+      document.activeElement?.getAttribute('role') === 'tab' &&
+      document.activeElement.getAttribute('aria-selected') === 'true',
+  )
   await page.keyboard.press('End')
   await page.getByRole('tab', { name: 'Fixture tab', selected: true }).waitFor()
   await clickMenu(app, 'Close tab')

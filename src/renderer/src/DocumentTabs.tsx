@@ -37,6 +37,7 @@ export function DocumentTabs({
   const wasClosing = useRef(false)
   const dragged = useRef<string | null>(null)
   const keyboardFocus = useRef<string | null>(null)
+  const navigationFocus = useRef<string | null>(null)
   const [drop, setDrop] = useState<{
     id: string
     side: 'before' | 'after'
@@ -131,6 +132,27 @@ export function DocumentTabs({
           ?.focus({ preventScroll: true })
       keyboardFocus.current = null
     }
+    if (
+      navigationFocus.current &&
+      (navigationFocus.current === activeAddonTab ||
+        (!activeAddonTab && navigationFocus.current === document.tabId))
+    ) {
+      const id = navigationFocus.current
+      navigationFocus.current = null
+      requestAnimationFrame(() => {
+        const focused = window.document.activeElement
+        if (
+          focused === window.document.body ||
+          strip.current?.contains(focused) ||
+          focused?.closest('.editor-panes, .addon-tab-panel')
+        )
+          strip.current
+            ?.querySelector<HTMLButtonElement>(
+              `[data-tab-id="${CSS.escape(id)}"]`,
+            )
+            ?.focus({ preventScroll: true })
+      })
+    }
     revealActive()
   }, [
     rendered,
@@ -192,6 +214,7 @@ export function DocumentTabs({
           event.preventDefault()
           const tab = ordered[next]
           if (tab) {
+            navigationFocus.current = tab.id
             if (tab.addon) onSelectAddon(tab.id)
             else onSelect(tab.id)
             event.currentTarget
