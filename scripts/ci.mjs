@@ -144,16 +144,14 @@ function runCI() {
   const root = process.cwd()
   const directory = join(root, '.cache/ci')
   const stateFile = join(directory, 'success.json')
-  const buildRuntime = `${process.platform}/${process.arch}/${process.version}`
-  const runtime = `${buildRuntime}/${process.env.ImageVersion ?? 'local'}`
+  const runtime = `${process.platform}/${process.arch}/${process.version}/${process.env.ImageVersion ?? 'local'}`
   const clean = ['true', '1'].includes(process.env.CI_CLEAN ?? '')
   let previous
   try {
     previous = JSON.parse(readFileSync(stateFile, 'utf8'))
     if (
       previous.version !== 1 ||
-      typeof previous.runtime !== 'string' ||
-      !previous.runtime.startsWith(`${buildRuntime}/`) ||
+      previous.runtime !== runtime ||
       !Array.isArray(previous.tests)
     )
       previous = undefined
@@ -194,12 +192,6 @@ function runCI() {
       'out/site/template.html',
     ].every((file) => existsSync(join(root, file))),
   })
-  // A new runner image can change system tools, so rerun tests but reuse builds
-  // made with the same Node toolchain and locked dependencies.
-  if (previous && previous.runtime !== runtime) {
-    plan.full = true
-    plan.tests = plan.allTests
-  }
   if (clean) {
     rmSync(join(root, 'out'), { recursive: true, force: true })
     rmSync(directory, { recursive: true, force: true })

@@ -50,20 +50,11 @@ test('desktop launch, isolation, offline reload, and recovery', {
     .getByText(/^electron 44\.3\.0$/i, { exact: true })
     .waitFor()
   await page.keyboard.press('Escape')
-  // ponytail: require this API in the snapshot once bulk tab closing lands.
-  const bulkClose = await page.evaluate(() =>
-    'closeDocumentTabs' in window.hibi
-      ? typeof window.hibi.closeDocumentTabs
-      : null,
-  )
-  assert.ok(bulkClose === null || bulkClose === 'function')
   assert.deepEqual(
     await page.evaluate(() => ({
       node: typeof window.require,
       process: typeof window.process,
-      api: Object.keys(window.hibi)
-        .filter((name) => name !== 'closeDocumentTabs')
-        .sort(),
+      api: Object.keys(window.hibi).sort(),
     })),
     {
       node: 'undefined',
