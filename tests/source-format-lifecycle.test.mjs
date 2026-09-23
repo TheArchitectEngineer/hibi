@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, startupDiagnostics } from './electron.mjs'
 import { clickMenu, pressShortcut } from './keyboard.mjs'
 
 test('lazy rich startup applies view attributes after mounting and accepts native input', {
@@ -138,11 +138,49 @@ test('standalone source skips rich attachment and hidden previews while preservi
   }, file)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
   await clickMenu(app, 'Open…')
-  await page
-    .locator(
-      '.editor-panes.mode-markdown[data-source-ready="true"] .source-pane:not([inert]) .cm-content[contenteditable="true"][aria-label="Probe editor"]',
-    )
-    .waitFor({ timeout: 30_000 })
+  try {
+    await page
+      .locator(
+        '.editor-panes.mode-markdown[data-source-ready="true"] .source-pane:not([inert]) .cm-content[contenteditable="true"][aria-label="Probe editor"]',
+      )
+      .waitFor({ timeout: 30_000 })
+  } catch (error) {
+    let timer
+    try {
+      const source = page.evaluate(() => {
+        const panes = document.querySelector('.editor-panes')
+        const pane = document.querySelector('.source-pane')
+        const content = pane?.querySelector('.cm-content')
+        return {
+          modeMarkdown: panes?.classList.contains('mode-markdown'),
+          sourceReady: panes?.getAttribute('data-source-ready'),
+          sourcePaneInert: pane?.inert,
+          contentEditable: content?.getAttribute('contenteditable'),
+          contentLabel: content?.getAttribute('aria-label'),
+          fontStatus: document.fonts.status,
+          fixtureRich: window.sourceFormatFixture?.rich,
+        }
+      })
+      const [startup, state] = await Promise.all([
+        startupDiagnostics(app, page),
+        Promise.race([
+          source.catch(() => ({ unavailable: true })),
+          new Promise((resolve) => {
+            timer = setTimeout(() => resolve({ unavailable: true }), 1000)
+          }),
+        ]),
+      ])
+      console.error(
+        'probe source readiness:',
+        JSON.stringify({ startup, state }),
+      )
+    } catch {
+      // Keep the original locator failure if diagnostics cannot run.
+    } finally {
+      clearTimeout(timer)
+    }
+    throw error
+  }
   await page.waitForFunction(() => window.sourceFormatFixture.rich === 0)
   assert.equal(await page.locator('.tiptap').count(), 0)
   const initial = await page.evaluate(() => {
