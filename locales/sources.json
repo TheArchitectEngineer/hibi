@@ -394,6 +394,9 @@
   "3cad12865151": [
     "src/main/updates.ts"
   ],
+  "716ca91b6062": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
   "2937cffb37ab": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
@@ -425,6 +428,9 @@
   "7346030400bf": [
     "src/addons/slash-commands/commands.ts",
     "src/renderer/src/FormattingToolbar.tsx"
+  ],
+  "27f07dbac4f2": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "1a9f084bf2db": [
     "src/main/document.ts"
@@ -573,6 +579,9 @@
   ],
   "57886749ce8a": [
     "src/addons/documentation/options.ts"
+  ],
+  "23d7c3da66d2": [
+    "src/main/updates.ts"
   ],
   "97ebc02f32f0": [
     "src/main/workspace-settings.ts"
@@ -1722,9 +1731,6 @@
   ],
   "cc05d3346ee5": [
     "src/main/workspace.ts"
-  ],
-  "0959de9e21ce": [
-    "src/renderer/src/UpdateSettings.tsx"
   ],
   "87c719d7d306": [
     "src/main/history.ts"
@@ -4525,6 +4531,9 @@
   ],
   "a7d3310ed7a2": [
     "src/main/updates.ts"
+  ],
+  "25ef3db952a5": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "19734a1b58ca": [
     "src/renderer/src/SettingsScreen.tsx"

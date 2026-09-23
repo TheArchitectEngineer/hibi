@@ -354,6 +354,57 @@ test('checks handle missing feeds, offline failures, concurrent actions, and ins
   assert.equal(development.mock.requests.length, 0)
 })
 
+test('startup check choice persists and leaves six-hour checks enabled', async (t) => {
+  const manager = await adapter(t, 'win32')
+  assert.equal(manager.getUpdateState().checkOnStartup, true)
+  assert.throws(() => manager.setUpdateStartupCheck('false'), /startup/)
+  await manager.setUpdateStartupCheck(false)
+  assert.equal(manager.getUpdateState().checkOnStartup, false)
+  assert.equal(
+    JSON.parse(
+      await readFile(join(manager.root, 'update-startup-check.json'), 'utf8'),
+    ),
+    false,
+  )
+  await manager.loadUpdates()
+  assert.equal(manager.getUpdateState().checkOnStartup, false)
+
+  const scheduled = []
+  const originalTimeout = globalThis.setTimeout
+  const originalInterval = globalThis.setInterval
+  try {
+    globalThis.setTimeout = (callback, delay) => {
+      scheduled.push({ callback, delay })
+      return { unref() {} }
+    }
+    globalThis.setInterval = (callback, delay) => {
+      scheduled.push({ callback, delay })
+      return { unref() {} }
+    }
+    manager.startUpdateChecks()
+  } finally {
+    globalThis.setTimeout = originalTimeout
+    globalThis.setInterval = originalInterval
+  }
+  assert.deepEqual(
+    scheduled.map(({ delay }) => delay),
+    [15_000, 6 * 60 * 60 * 1000],
+  )
+  manager.mock.version = version
+  scheduled[0].callback()
+  assert.equal(manager.mock.requests.length, 0)
+  scheduled[1].callback()
+  await new Promise(setImmediate)
+  assert.equal(manager.mock.requests.length, 1)
+  assert.equal(manager.getUpdateState().status, 'idle')
+
+  await manager.setUpdateStartupCheck(true)
+  scheduled[0].callback()
+  await new Promise(setImmediate)
+  assert.equal(manager.mock.requests.length, 2)
+  assert.equal(manager.getUpdateState().checkOnStartup, true)
+})
+
 test('windows and linux pin downloads and install only after close confirmation; cancellation and errors keep protection', async (t) => {
   for (const platform of ['win32', 'linux']) {
     const manager = await adapter(t, platform)
@@ -407,6 +458,10 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       () => !document.querySelector('#update-channel').disabled,
     )
     assert.equal(await picker.inputValue(), expected)
+    const startup = page.getByRole('checkbox', {
+      name: 'Check for updates on startup',
+    })
+    assert.equal(await startup.isChecked(), expected === 'nightly-green')
     if (expected === 'nightly') {
       assert.deepEqual(errors, [])
       await app.close()
@@ -421,6 +476,15 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       page.evaluate(() => window.hibi.setUpdateChannel('https://evil.invalid')),
       /valid update channel/,
     )
+    await assert.rejects(
+      page.evaluate(() => window.hibi.setUpdateStartupCheck('false')),
+      /startup/,
+    )
+    await startup.click()
+    await page.waitForFunction(
+      async () => !(await window.hibi.getUpdateState()).checkOnStartup,
+    )
+    assert.equal(await startup.isChecked(), false)
     await picker.selectOption('nightly')
     await page.waitForFunction(
       async () => (await window.hibi.getUpdateState()).channel === 'nightly',
@@ -443,6 +507,7 @@ test('update settings expose both channels, persist choice, and fit narrow windo
           channel: 'nightly',
           status,
           supported: true,
+          checkOnStartup: false,
           version,
           broken,
           progress,
@@ -472,6 +537,7 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       `An update is available: ${version}`,
     )
     assert.equal(await picker.isDisabled(), true)
+    assert.equal(await startup.isDisabled(), true)
     for (const width of [480, 1000]) {
       await page.setViewportSize({ width, height: 760 })
       await mkdir('test-results', { recursive: true })

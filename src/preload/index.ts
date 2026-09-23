@@ -85,6 +85,8 @@ if (process.isMainFrame) {
     getUpdateState: () => transport.invoke(UPDATE_CHANNELS.get),
     setUpdateChannel: (channel) =>
       transport.invoke(UPDATE_CHANNELS.channel, channel),
+    setUpdateStartupCheck: (enabled) =>
+      transport.invoke(UPDATE_CHANNELS.startup, enabled),
     checkForUpdates: () => transport.invoke(UPDATE_CHANNELS.check),
     downloadUpdate: () => transport.invoke(UPDATE_CHANNELS.download),
     installUpdate: () => ipcRenderer.invoke(UPDATE_CHANNELS.install),

@@ -1,7 +1,7 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { errorMessage } from '../../shared/errors'
 import type { UpdateChannel, UpdateState } from '../../shared/updates'
-import { Button, Select, SettingRow } from '../../ui/Controls'
+import { Button, Select, SettingRow, Toggle } from '../../ui/Controls'
 
 export function UpdateSettings() {
   const [state, setState] = useState<UpdateState | null>(null)
@@ -69,9 +69,25 @@ export function UpdateSettings() {
           </Select>
         </SettingRow>
         <SettingRow
+          id="update-startup-check"
+          label="Check for updates on startup"
+          description="When enabled, installed builds check shortly after Hibi opens. Six-hour checks continue either way."
+        >
+          <Toggle
+            id="update-startup-check"
+            checked={state?.checkOnStartup ?? true}
+            disabled={waiting}
+            onChange={(event) =>
+              void run(() =>
+                window.hibi.setUpdateStartupCheck(event.target.checked),
+              )
+            }
+          />
+        </SettingRow>
+        <SettingRow
           id="check-updates"
           label="Check for updates"
-          description="Hibi checks at startup and every six hours. Downloads start when you choose."
+          description="Checks every six hours. Downloads start when you choose."
         >
           <Button
             id="check-updates"

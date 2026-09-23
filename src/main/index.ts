@@ -121,6 +121,7 @@ import {
   loadUpdates,
   onUpdateInstallFailure,
   setUpdateChannel,
+  setUpdateStartupCheck,
   startUpdateChecks,
 } from './updates'
 import {
@@ -724,6 +725,11 @@ if (!app.requestSingleInstanceLock()) {
       handle(
         UPDATE_CHANNELS.channel,
         (_event, channel: unknown) => setUpdateChannel(channel),
+        updatesReady,
+      )
+      handle(
+        UPDATE_CHANNELS.startup,
+        (_event, enabled: unknown) => setUpdateStartupCheck(enabled),
         updatesReady,
       )
       handle(UPDATE_CHANNELS.check, checkForUpdates, updatesReady)

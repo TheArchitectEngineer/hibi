@@ -1,6 +1,7 @@
 export const UPDATE_CHANNELS = {
   get: 'updates:get',
   channel: 'updates:channel',
+  startup: 'updates:startup',
   check: 'updates:check',
   download: 'updates:download',
   install: 'updates:install',
@@ -10,6 +11,7 @@ export const UPDATE_CHANNELS = {
 export type UpdateChannel = 'nightly-green' | 'nightly'
 export type UpdateState = {
   channel: UpdateChannel
+  checkOnStartup: boolean
   status:
     | 'idle'
     | 'checking'

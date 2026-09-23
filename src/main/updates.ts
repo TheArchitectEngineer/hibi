@@ -15,6 +15,7 @@ import {
 
 let state: UpdateState = {
   channel: 'nightly-green',
+  checkOnStartup: true,
   status: 'idle',
   supported: false,
   message: 'Updates are available in installed builds.',
@@ -29,6 +30,8 @@ const unsupportedMessage =
   'Updates require an installed macOS or Windows build, or a running Linux AppImage.'
 const preferencePath = () =>
   join(app.getPath('userData'), 'update-channel.json')
+const startupPreferencePath = () =>
+  join(app.getPath('userData'), 'update-startup-check.json')
 export const getUpdateState = () => ({ ...state })
 export function onUpdateInstallFailure(callback?: () => void) {
   installFailure = callback
@@ -78,6 +81,12 @@ export async function loadUpdates() {
   } catch {
     /* Missing or old preferences use the recommended channel. */
   }
+  try {
+    const saved = JSON.parse(await readFile(startupPreferencePath(), 'utf8'))
+    if (typeof saved === 'boolean') state.checkOnStartup = saved
+  } catch {
+    /* Missing preferences check on startup. */
+  }
   state.supported =
     app.isPackaged &&
     ((process.platform === 'darwin' &&
@@ -102,8 +111,22 @@ export function startUpdateChecks() {
     )
       void checkForUpdates().catch(() => {})
   }
-  setTimeout(check, 15_000).unref()
+  setTimeout(() => {
+    if (state.checkOnStartup) check()
+  }, 15_000).unref()
   setInterval(check, 6 * 60 * 60 * 1000).unref()
+}
+
+export function setUpdateStartupCheck(input: unknown) {
+  if (typeof input !== 'boolean')
+    throw new Error('Choose whether to check for updates on startup.')
+  return run(async () => {
+    await writeFile(`${startupPreferencePath()}.tmp`, JSON.stringify(input), {
+      mode: 0o600,
+    })
+    await rename(`${startupPreferencePath()}.tmp`, startupPreferencePath())
+    publish({ checkOnStartup: input })
+  })
 }
 
 export function setUpdateChannel(input: unknown) {
