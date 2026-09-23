@@ -54,7 +54,7 @@ test('desktop launch, isolation, offline reload, and recovery', {
     await page.evaluate(() => ({
       node: typeof window.require,
       process: typeof window.process,
-      api: Object.keys(window.hibi),
+      api: Object.keys(window.hibi).sort(),
     })),
     {
       node: 'undefined',
@@ -142,7 +142,7 @@ test('desktop launch, isolation, offline reload, and recovery', {
         'saveHotkeys',
         'setHotkeyRecording',
         'onCommand',
-      ],
+      ].sort(),
     },
   )
   const preferences = await app.evaluate(({ BrowserWindow }) => {
