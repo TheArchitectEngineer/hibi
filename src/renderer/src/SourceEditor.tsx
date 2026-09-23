@@ -174,7 +174,6 @@ export function SourceEditor({
   const [installedExtensions, setInstalledExtensions] = useState<
     readonly SourceExtension[] | null
   >(null)
-  const [measured, setMeasured] = useState(false)
   const [extensionError, setExtensionError] = useState('')
   const [languageError, setLanguageError] = useState('')
   const [languageReady, setLanguageReady] = useState(!codeLanguage)
@@ -763,11 +762,7 @@ export function SourceEditor({
     const unsubscribe = codeLanguages.subscribe(() => configureParser.current())
     configureParser.current()
     const measure = () => {
-      if (!disposed)
-        editor.requestMeasure({
-          read: () => null,
-          write: () => setMeasured(true),
-        })
+      if (!disposed) editor.requestMeasure()
     }
     measure()
     void window.document.fonts.load('13px "Geist Mono"').then(measure, measure)
@@ -825,11 +820,11 @@ export function SourceEditor({
     ready.current(
       extensionError || languageError
         ? 'failed'
-        : inputReady && measured
+        : inputReady
           ? 'ready'
           : 'loading',
     )
-  }, [inputReady, measured, extensionError, languageError])
+  }, [inputReady, extensionError, languageError])
 
   useEffect(() => {
     view.current?.dispatch({
