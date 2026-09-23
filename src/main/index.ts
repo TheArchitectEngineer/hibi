@@ -121,6 +121,7 @@ import {
   loadUpdates,
   onUpdateInstallFailure,
   setUpdateChannel,
+  setUpdateCheckFrequency,
   setUpdateStartupCheck,
   startUpdateChecks,
 } from './updates'
@@ -730,6 +731,11 @@ if (!app.requestSingleInstanceLock()) {
       handle(
         UPDATE_CHANNELS.startup,
         (_event, enabled: unknown) => setUpdateStartupCheck(enabled),
+        updatesReady,
+      )
+      handle(
+        UPDATE_CHANNELS.frequency,
+        (_event, hours: unknown) => setUpdateCheckFrequency(hours),
         updatesReady,
       )
       handle(UPDATE_CHANNELS.check, checkForUpdates, updatesReady)

@@ -1,6 +1,10 @@
 import { type CSSProperties, useEffect, useState } from 'react'
 import { errorMessage } from '../../shared/errors'
-import type { UpdateChannel, UpdateState } from '../../shared/updates'
+import type {
+  UpdateChannel,
+  UpdateCheckFrequency,
+  UpdateState,
+} from '../../shared/updates'
 import { Button, Select, SettingRow, Toggle } from '../../ui/Controls'
 
 export function UpdateSettings() {
@@ -49,7 +53,7 @@ export function UpdateSettings() {
         <SettingRow
           id="update-channel"
           label="Update channel"
-          description="Recommended nightly includes builds that passed every required check. Nightly also includes builds with failed checks."
+          description="Select a release channel to subscribe to."
         >
           <Select
             id="update-channel"
@@ -71,7 +75,7 @@ export function UpdateSettings() {
         <SettingRow
           id="update-startup-check"
           label="Check for updates on startup"
-          description="When enabled, installed builds check shortly after Hibi opens. Six-hour checks continue either way."
+          description="Check for updates shortly after Hibi opens."
         >
           <Toggle
             id="update-startup-check"
@@ -87,9 +91,33 @@ export function UpdateSettings() {
           />
         </SettingRow>
         <SettingRow
+          id="update-check-frequency"
+          label="Check frequency"
+          description="Choose how often Hibi checks for updates."
+        >
+          <Select
+            id="update-check-frequency"
+            aria-describedby="update-check-frequency-description"
+            disabled={waiting}
+            value={state?.checkFrequency ?? 6}
+            onChange={(event) =>
+              void run(() =>
+                window.hibi.setUpdateCheckFrequency(
+                  Number(event.target.value) as UpdateCheckFrequency,
+                ),
+              )
+            }
+          >
+            <option value={1}>Every hour</option>
+            <option value={6}>Every 6 hours</option>
+            <option value={12}>Every 12 hours</option>
+            <option value={24}>Every 24 hours</option>
+          </Select>
+        </SettingRow>
+        <SettingRow
           id="check-updates"
           label="Check for updates"
-          description="Checks every six hours. Downloads start when you choose."
+          description="Check for new updates on the configured channel."
         >
           <Button
             id="check-updates"

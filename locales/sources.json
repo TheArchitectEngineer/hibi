@@ -391,6 +391,9 @@
   "b9e81709a10d": [
     "src/renderer/src/DependencySettings.tsx"
   ],
+  "4dd68fc697c5": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
   "f26f3275e735": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
@@ -398,6 +401,12 @@
     "src/main/updates.ts"
   ],
   "716ca91b6062": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
+  "fd3536b2cc5b": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
+  "12e9b9ef6f4b": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
   "2937cffb37ab": [
@@ -431,9 +440,6 @@
   "7346030400bf": [
     "src/addons/slash-commands/commands.ts",
     "src/renderer/src/FormattingToolbar.tsx"
-  ],
-  "27f07dbac4f2": [
-    "src/renderer/src/UpdateSettings.tsx"
   ],
   "1a9f084bf2db": [
     "src/main/document.ts"
@@ -522,6 +528,9 @@
   "26a5af5d66ea": [
     "src/shared/updates.ts"
   ],
+  "471562a8660b": [
+    "src/shared/updates.ts"
+  ],
   "d1eb8cb18d78": [
     "src/main/links.ts"
   ],
@@ -564,6 +573,9 @@
   "6e8eb2b02596": [
     "src/renderer/src/ImportDialog.tsx",
     "src/renderer/src/WorkspaceSettings.tsx"
+  ],
+  "ad9fc50d7216": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "fab6f4954081": [
     "src/renderer/src/EditorToolbar.tsx"
@@ -1434,6 +1446,18 @@
   ],
   "4e1f49a9c8ae": [
     "src/addons/diagnostics/Settings.tsx"
+  ],
+  "9a289972dd1e": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
+  "1c67e3d6fa03": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
+  "7baa20dcbad6": [
+    "src/renderer/src/UpdateSettings.tsx"
+  ],
+  "a4bac4655d45": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "a17d1c887e54": [
     "src/renderer/src/main.tsx"
@@ -3021,9 +3045,6 @@
   "8bc443715025": [
     "src/renderer/src/UpdateSettings.tsx"
   ],
-  "e5e8f93e69c2": [
-    "src/renderer/src/UpdateSettings.tsx"
-  ],
   "80e8dd1a5a05": [
     "src/addons/diagnostics/Settings.tsx"
   ],
@@ -3340,6 +3361,9 @@
   ],
   "e6c08bcacceb": [
     "src/addons/typing-speed/manifest.ts"
+  ],
+  "a767b8dfdabc": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "fdce13fe6d64": [
     "src/renderer/src/HotkeySettings.tsx"
@@ -4539,9 +4563,6 @@
   ],
   "a7d3310ed7a2": [
     "src/main/updates.ts"
-  ],
-  "25ef3db952a5": [
-    "src/renderer/src/UpdateSettings.tsx"
   ],
   "19734a1b58ca": [
     "src/renderer/src/SettingsScreen.tsx"

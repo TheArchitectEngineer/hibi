@@ -19,6 +19,7 @@ import { updateFeed } from '../scripts/update-feed.mjs'
 import {
   newerUpdate,
   updateChannel,
+  updateCheckFrequency,
   updateRelease,
 } from '../src/shared/updates.ts'
 import { electron } from './electron.mjs'
@@ -60,6 +61,9 @@ test('channels fail closed and nightly ordering uses numeric runs rather than co
   assert.equal(updateChannel('nightly'), 'nightly')
   for (const input of ['stable', 'https://evil.invalid', null, {}, 1])
     assert.throws(() => updateChannel(input))
+  for (const input of [0, 2, '6', null])
+    assert.throws(() => updateCheckFrequency(input))
+  assert.equal(updateCheckFrequency(24), 24)
   assert.equal(updateRelease(manifest(), 'nightly-green').version, version)
   assert.equal(
     updateRelease(manifest(true), 'nightly').status,
@@ -354,10 +358,12 @@ test('checks handle missing feeds, offline failures, concurrent actions, and ins
   assert.equal(development.mock.requests.length, 0)
 })
 
-test('startup check choice persists and leaves six-hour checks enabled', async (t) => {
+test('startup and frequency choices persist and reschedule checks', async (t) => {
   const manager = await adapter(t, 'win32')
   assert.equal(manager.getUpdateState().checkOnStartup, true)
+  assert.equal(manager.getUpdateState().checkFrequency, 6)
   assert.throws(() => manager.setUpdateStartupCheck('false'), /startup/)
+  assert.throws(() => manager.setUpdateCheckFrequency('12'), /frequency/)
   await manager.setUpdateStartupCheck(false)
   assert.equal(manager.getUpdateState().checkOnStartup, false)
   assert.equal(
@@ -370,30 +376,46 @@ test('startup check choice persists and leaves six-hour checks enabled', async (
   assert.equal(manager.getUpdateState().checkOnStartup, false)
 
   const scheduled = []
+  const cleared = []
   const originalTimeout = globalThis.setTimeout
   const originalInterval = globalThis.setInterval
+  const originalClearInterval = globalThis.clearInterval
   try {
     globalThis.setTimeout = (callback, delay) => {
       scheduled.push({ callback, delay })
       return { unref() {} }
     }
     globalThis.setInterval = (callback, delay) => {
-      scheduled.push({ callback, delay })
-      return { unref() {} }
+      const timer = { unref() {} }
+      scheduled.push({ callback, delay, timer })
+      return timer
     }
+    globalThis.clearInterval = (timer) => cleared.push(timer)
     manager.startUpdateChecks()
+    await manager.setUpdateCheckFrequency(12)
   } finally {
     globalThis.setTimeout = originalTimeout
     globalThis.setInterval = originalInterval
+    globalThis.clearInterval = originalClearInterval
   }
   assert.deepEqual(
     scheduled.map(({ delay }) => delay),
-    [15_000, 6 * 60 * 60 * 1000],
+    [15_000, 6 * 60 * 60 * 1000, 12 * 60 * 60 * 1000],
   )
+  assert.deepEqual(cleared, [scheduled[1].timer])
+  assert.equal(manager.getUpdateState().checkFrequency, 12)
+  assert.equal(
+    JSON.parse(
+      await readFile(join(manager.root, 'update-check-frequency.json'), 'utf8'),
+    ),
+    12,
+  )
+  await manager.loadUpdates()
+  assert.equal(manager.getUpdateState().checkFrequency, 12)
   manager.mock.version = version
   scheduled[0].callback()
   assert.equal(manager.mock.requests.length, 0)
-  scheduled[1].callback()
+  scheduled[2].callback()
   await new Promise(setImmediate)
   assert.equal(manager.mock.requests.length, 1)
   assert.equal(manager.getUpdateState().status, 'idle')
@@ -458,6 +480,11 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       () => !document.querySelector('#update-channel').disabled,
     )
     assert.equal(await picker.inputValue(), expected)
+    const frequency = page.getByLabel('Check frequency', { exact: true })
+    assert.equal(
+      await frequency.inputValue(),
+      expected === 'nightly' ? '12' : '6',
+    )
     const startup = page.getByRole('checkbox', {
       name: 'Check for updates on startup',
     })
@@ -479,6 +506,14 @@ test('update settings expose both channels, persist choice, and fit narrow windo
     await assert.rejects(
       page.evaluate(() => window.hibi.setUpdateStartupCheck('false')),
       /startup/,
+    )
+    await assert.rejects(
+      page.evaluate(() => window.hibi.setUpdateCheckFrequency(2)),
+      /frequency/,
+    )
+    await frequency.selectOption('12')
+    await page.waitForFunction(
+      async () => (await window.hibi.getUpdateState()).checkFrequency === 12,
     )
     await startup.uncheck()
     await page.waitForFunction(
