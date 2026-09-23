@@ -159,6 +159,11 @@ test('standalone source skips rich attachment and hidden previews while preservi
           contentLabel: content?.getAttribute('aria-label'),
           fontStatus: document.fonts.status,
           fixtureRich: window.sourceFormatFixture?.rich,
+          documentName:
+            window.sourceFormatFixture?.context.editor.getDocument()?.name,
+          alerts: Array.from(document.querySelectorAll('[role="alert"]'))
+            .slice(0, 3)
+            .map((alert) => alert.textContent?.slice(0, 200)),
         }
       })
       const [startup, state] = await Promise.all([
