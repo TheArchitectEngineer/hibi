@@ -25,16 +25,19 @@ runs:
           .cache/electron
           .cache/electron-builder
         key: electron-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc') }}
+    - id: image
+      shell: bash
+      run: echo "version=${ImageVersion:-local}" >> "$GITHUB_OUTPUT"
     - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       if: inputs.clean != 'true'
       with:
         path: |
           .cache/ci
           out
-        key: checks-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        key: checks-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-${{ steps.image.outputs.version }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: |
-          checks-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-${{ inputs.base }}-
-          checks-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-
+          checks-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-${{ steps.image.outputs.version }}-${{ inputs.base }}-
+          checks-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', '.nvmrc', 'scripts/ci.mjs') }}-${{ steps.image.outputs.version }}-
     - run: npm ci
       shell: bash
     - id: check

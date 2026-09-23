@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { build } from 'esbuild'
-import { electron } from './electron.mjs'
+import { electron, waitForDocumentEditor } from './electron.mjs'
 
 const cases = [
   { name: 'empty', source: '' },
@@ -238,9 +238,7 @@ test('paginated worker semantics match native schema text, headings and counts',
   const page = await app.firstWindow()
   page.setDefaultTimeout(7000)
   for (const disabled of [[], ['core.heading-1', 'core.bold', 'core.images']]) {
-    await page
-      .getByRole('textbox', { name: 'Document editor', exact: true })
-      .waitFor()
+    await waitForDocumentEditor(app, page)
     if (disabled.length) {
       await page.evaluate(
         (disabled) =>
@@ -251,9 +249,7 @@ test('paginated worker semantics match native schema text, headings and counts',
         disabled,
       )
       await page.reload()
-      await page
-        .getByRole('textbox', { name: 'Document editor', exact: true })
-        .waitFor()
+      await waitForDocumentEditor(app, page)
     }
     await page.waitForFunction(
       () =>

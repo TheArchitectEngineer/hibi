@@ -108,6 +108,7 @@ const VersionHistory = lazy(() =>
   })),
 )
 function App() {
+  startupMark('app-render')
   const addonViewState = useSyncExternalStore(
     addonViews.subscribe,
     addonViews.snapshot,
@@ -222,6 +223,7 @@ function App() {
   }, [needsRichEditor, richEditor])
   const DocumentEditor = markdownDocument ? richEditor.Component : FormatEditor
   useLayoutEffect(() => {
+    startupMark('app-layout-effect')
     editorDocument.publish(documentRuntime.get() ?? document)
   }, [document])
   const currentDocument = useRef(document)
@@ -798,9 +800,11 @@ function App() {
       .then((items) => {
         if (active) setRecentWorkspaces(items)
       })
+    startupMark('bootstrap-document-effect')
     window.hibi.bootstrap
       .document()
       .then(({ info, document, hotkeys, workspace, externalPending }) => {
+        startupMark('bootstrap-document-result')
         if (active) {
           initialExternalPending.current = externalPending
           setWorkspace(workspace)

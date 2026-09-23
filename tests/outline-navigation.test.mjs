@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, waitForDocumentEditor } from './electron.mjs'
 import { clickMenu } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 
@@ -37,7 +37,7 @@ test('large outline follows rich and source carets with bounded rows and ignores
     name: 'Document editor',
     exact: true,
   })
-  await rich.waitFor()
+  await waitForDocumentEditor(app, page)
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
   }, file)
@@ -191,9 +191,7 @@ test('source outline resolves references through its worker and preserves native
   })
   const page = await app.firstWindow()
   page.setDefaultTimeout(7000)
-  await page
-    .getByRole('textbox', { name: 'Document editor', exact: true })
-    .waitFor()
+  await waitForDocumentEditor(app, page)
   await page.evaluate(() => {
     localStorage.setItem(
       'hibi:markdown-syntax-disabled',
@@ -205,7 +203,7 @@ test('source outline resolves references through its worker and preserves native
     name: 'Document editor',
     exact: true,
   })
-  await rich.waitFor()
+  await waitForDocumentEditor(app, page)
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
   }, file)

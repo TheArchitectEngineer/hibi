@@ -77,9 +77,11 @@ test('overflowing tabs reveal close buttons and reorder without losing drafts', 
   await fullyVisible()
   await open(files[0])
   await fullyVisible()
-  await page
-    .getByRole('textbox', { name: /document editor/i })
-    .fill('keep this reordered draft')
+  await replaceRichText(
+    page,
+    page.getByRole('textbox', { name: /document editor/i }),
+    'keep this reordered draft',
+  )
   let state = await page.evaluate(() => window.hibi.getDocument())
   const activeId = state.tabId,
     neighbor = state.tabs[1].id
@@ -184,9 +186,11 @@ test('single-file mode guards replacement, closes other tabs safely, and persist
   })
   let page = await app.firstWindow()
   page.setDefaultTimeout(6000)
-  await page
-    .getByRole('textbox', { name: /document editor/i })
-    .fill('keep this draft')
+  await replaceRichText(
+    page,
+    page.getByRole('textbox', { name: /document editor/i }),
+    'keep this draft',
+  )
   await app.evaluate(
     ({ dialog }, { b, savedDraft }) => {
       globalThis.choice = 2
@@ -234,9 +238,11 @@ test('single-file mode guards replacement, closes other tabs safely, and persist
     await page.locator('.single-document-title').innerText(),
     /b\.md/,
   )
-  await page
-    .getByRole('textbox', { name: /document editor/i })
-    .fill('changed b')
+  await replaceRichText(
+    page,
+    page.getByRole('textbox', { name: /document editor/i }),
+    'changed b',
+  )
   await page
     .locator('.single-document-title')
     .getByRole('status', { name: /unsaved changes/i })

@@ -91,8 +91,6 @@ test('hibi opens first, sponsor uses a fixed URL, and license dialogs stay reada
     .filter({ has: page.locator('.license-name', { hasText: /^react19/ }) })
   await react.waitFor()
   await page.evaluate(() => document.fonts.ready)
-  await react.scrollIntoViewIfNeeded()
-  await react.hover()
   assert.deepEqual(
     await react.evaluate((element) => {
       const style = getComputedStyle(element)

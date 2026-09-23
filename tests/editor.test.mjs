@@ -25,6 +25,7 @@ test('empty entry, three views, and lossless source switching', {
   })
   const page = await app.firstWindow()
   page.setDefaultTimeout(7000)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   const rich = page.getByRole('textbox', { name: /document editor/i })
   await rich.waitFor()
   assert.equal((await rich.innerText()).trim(), '')

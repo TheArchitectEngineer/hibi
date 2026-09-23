@@ -20,7 +20,7 @@ import {
 } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, placeholder } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DocumentFormat, SourceExtension } from '../../addons/api'
 import { type DocumentState, MAX_DOCUMENT_BYTES } from '../../shared/desktop'
 import { editedSource, sourceEditMatches } from '../../shared/document-edits'
@@ -174,7 +174,6 @@ export function SourceEditor({
   const [installedExtensions, setInstalledExtensions] = useState<
     readonly SourceExtension[] | null
   >(null)
-  const [measured, setMeasured] = useState(false)
   const [extensionError, setExtensionError] = useState('')
   const [languageError, setLanguageError] = useState('')
   const [languageReady, setLanguageReady] = useState(!codeLanguage)
@@ -182,8 +181,13 @@ export function SourceEditor({
   const inputReady = installedExtensions === sourceExtensions && languageReady
   const editContext = useRef({ document, editTarget, disabled, inputReady })
   editContext.current = { document, editTarget, disabled, inputReady }
-  const [session] = useState(() => documentRuntime.session()!)
-  const [bridge] = useState(() => createSourceSession(session))
+  const [bridgeRetry, retryBridge] = useState(0)
+  const session = documentRuntime.session()!
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retry refreshes a bridge whose snapshot went stale before attachment.
+  const bridge = useMemo(
+    () => createSourceSession(session),
+    [session, bridgeRetry],
+  )
   const exactChanges = useRef<readonly RawEdit[] | undefined>(undefined)
   const editable = useRef(new Compartment())
   const numbers = useRef(new Compartment())
@@ -417,6 +421,20 @@ export function SourceEditor({
 
   useEffect(() => {
     if (!host.current) return
+    const active = documentRuntime.get()
+    if (
+      !active ||
+      active.tabId !== document.tabId ||
+      active.revision !== document.revision
+    )
+      return
+    if (
+      documentRuntime.session() !== session ||
+      !session.ownsCurrentSnapshot(bridge.snapshot())
+    ) {
+      retryBridge((retry) => retry + 1)
+      return
+    }
     const language = new Compartment()
     const markdown = () => {
       const {
@@ -763,11 +781,7 @@ export function SourceEditor({
     const unsubscribe = codeLanguages.subscribe(() => configureParser.current())
     configureParser.current()
     const measure = () => {
-      if (!disposed)
-        editor.requestMeasure({
-          read: () => null,
-          write: () => setMeasured(true),
-        })
+      if (!disposed) editor.requestMeasure()
     }
     measure()
     void window.document.fonts.load('13px "Geist Mono"').then(measure, measure)
@@ -793,6 +807,8 @@ export function SourceEditor({
   }, [
     bridge,
     session,
+    document.tabId,
+    document.revision,
     requestFind,
     requestReference,
     resolveReference,
@@ -822,14 +838,15 @@ export function SourceEditor({
     }
   }, [sourceExtensions])
   useEffect(() => {
+    // CodeMirror measures on an animation frame; editing cannot wait for paint.
     ready.current(
       extensionError || languageError
         ? 'failed'
-        : inputReady && measured
+        : inputReady
           ? 'ready'
           : 'loading',
     )
-  }, [inputReady, measured, extensionError, languageError])
+  }, [inputReady, extensionError, languageError])
 
   useEffect(() => {
     view.current?.dispatch({

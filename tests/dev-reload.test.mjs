@@ -205,6 +205,17 @@ test('development watches renderer, preload, addons, and documentation generatio
     )
   }
   t.diagnostic('preload updated, draft retained, other navigation blocked')
+  await page.evaluate(() => window.hibi.setAddonEnabled('diagnostics', false))
+  await page.reload()
+  assert.equal(
+    await page.evaluate(
+      async () =>
+        (await window.hibi.getAddonStates()).find(
+          (entry) => entry.id === 'diagnostics',
+        ).enabled,
+    ),
+    false,
+  )
   await replace('scripts/addon-reference.mjs', '[Source]', '[Updated source]')
   await until(
     async () =>
@@ -217,15 +228,4 @@ test('development watches renderer, preload, addons, and documentation generatio
     'documentation generator reloads',
   )
   t.diagnostic('documentation generator updated')
-  await page.evaluate(() => window.hibi.setAddonEnabled('diagnostics', false))
-  await page.reload()
-  assert.equal(
-    await page.evaluate(
-      async () =>
-        (await window.hibi.getAddonStates()).find(
-          (entry) => entry.id === 'diagnostics',
-        ).enabled,
-    ),
-    false,
-  )
 })

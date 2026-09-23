@@ -80,7 +80,7 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
     name: 'Document editor',
     exact: true,
   })
-  await editor.fill('first document')
+  await replaceRichText(page, editor, 'first document')
   await page.waitForFunction(() => window.viewsFixture)
   await page.evaluate(() => window.viewsFixture.staged.show())
   await page
@@ -103,7 +103,11 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
     window.viewsFixture.handles.follow = window.viewsFixture.follow.open()
   })
   await clickMenu(app, 'New')
-  await editor.fill('second document')
+  await page.waitForFunction(
+    (id) => window.viewsFixture.context.editor.getDocument().tabId !== id,
+    first,
+  )
+  await replaceRichText(page, editor, 'second document')
   assert.equal(
     await panel.locator('.bound-text').textContent(),
     'first document',

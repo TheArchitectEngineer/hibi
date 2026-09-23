@@ -138,26 +138,24 @@ test('published development docs render linked, highlighted API pages offline at
   })
   await app.firstWindow()
   const next = app.waitForEvent('window')
-  await app.evaluate(({ BrowserWindow }, output) => {
-    const viewer = new BrowserWindow({
-      width: 1280,
-      height: 900,
-      show: false,
-      webPreferences: {
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        backgroundThrottling: false,
-      },
-    })
-    void viewer.loadFile(output)
-  }, output)
-  const page = await next
-  const errors = []
-  page.on('pageerror', (error) => errors.push(error.message))
-  await page.goto(
+  await app.evaluate(
+    ({ BrowserWindow }, url) => {
+      const viewer = new BrowserWindow({
+        width: 1280,
+        height: 900,
+        show: false,
+        webPreferences: {
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          backgroundThrottling: false,
+        },
+      })
+      void viewer.loadURL(url)
+    },
     `${pathToFileURL(output).href}#page=development%2Faddon-api-reference%2FDialogApi.md`,
   )
+  const page = await next
   await page.getByRole('heading', { name: 'DialogApi', exact: true }).waitFor()
   assert.equal(await page.evaluate(() => typeof window.hibi), 'undefined')
   assert.ok(await page.locator('article pre .hibi-token-keyword').count())
@@ -214,5 +212,5 @@ test('published development docs render linked, highlighted API pages offline at
     assert.equal(geometry.pageOverflow, false)
     await page.screenshot({ path: `test-results/api-reference-${width}.png` })
   }
-  assert.deepEqual(errors, [])
+  assert.deepEqual(await page.pageErrors(), [])
 })
