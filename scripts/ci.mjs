@@ -80,9 +80,14 @@ export function planChecks(
           /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]/g,
         ),
       ].map((match) => match[1])
-      const serial = imports.some((name) =>
-        /electron|playwright|worker_threads/.test(name),
-      )
+      const serial =
+        imports.some((name) =>
+          /electron|playwright|worker_threads/.test(name),
+        ) ||
+        (file.startsWith('tests/') &&
+          /\b(?:setTimeout|setInterval|setImmediate|Date\.now|performance\.now|timeoutMs|retryDelays)\b/.test(
+            source,
+          ))
       const readsFiles = /['"](?:node:)?fs(?:\/promises)?['"]/.test(source)
       let dynamic =
         /['"](?:node:)?child_process['"]/.test(source) ||

@@ -18,6 +18,8 @@ test('incremental checks select dependencies and fall back safely for cold, clea
     'tests/indirect.test.mjs': "import './desktop-helper.mjs'",
     'tests/desktop-helper.mjs': "import './electron.mjs'",
     'tests/browser.test.mjs': "import { chromium } from 'playwright'",
+    'tests/timer.test.mjs': 'setTimeout(() => {}, 2000)',
+    'tests/clock.test.mjs': 'const deadline = Date.now() + 2000',
     'tests/electron.mjs': "import { _electron } from 'playwright'",
     'tests/io.test.mjs': "import { readFile } from 'node:fs/promises'",
     'tests/helper.mjs': "export { one } from '../src/shared/one.ts'",
