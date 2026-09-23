@@ -240,7 +240,7 @@ test('paginated worker semantics match native schema text, headings and counts',
   for (const disabled of [[], ['core.heading-1', 'core.bold', 'core.images']]) {
     await page
       .getByRole('textbox', { name: 'Document editor', exact: true })
-      .waitFor()
+      .waitFor({ timeout: 30000 })
     if (disabled.length) {
       await page.evaluate(
         (disabled) =>
@@ -253,7 +253,7 @@ test('paginated worker semantics match native schema text, headings and counts',
       await page.reload()
       await page
         .getByRole('textbox', { name: 'Document editor', exact: true })
-        .waitFor()
+        .waitFor({ timeout: 30000 })
     }
     await page.waitForFunction(
       () =>

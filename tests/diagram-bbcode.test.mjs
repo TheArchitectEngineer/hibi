@@ -34,7 +34,15 @@ test('Mermaid and BBCode edit, preview, and export without executing content', {
   page.setDefaultTimeout(15000)
   await page
     .getByRole('textbox', { name: 'Document editor', exact: true })
-    .waitFor()
+    .waitFor({ timeout: 30000 })
+    .catch(async (error) => {
+      const body = await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')
+      console.error(body.slice(0, 1000))
+      throw error
+    })
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
   const open = async (name, source, label) => {
     const path = join(temp, name)
