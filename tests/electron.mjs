@@ -44,6 +44,70 @@ export const electron = {
   },
 }
 
+function startupEntries() {
+  const doc = globalThis.document
+  const editor = doc?.querySelector('.editor-page')
+  return {
+    dom: doc && {
+      readyState: doc.readyState,
+      editorBusy: editor?.getAttribute('aria-busy'),
+      editorInert: editor?.inert,
+      loading: doc.querySelectorAll('.loading-screen').length,
+      editable: doc.querySelectorAll('.tiptap[contenteditable="true"]').length,
+    },
+    stages: performance
+      .getEntries()
+      .filter((entry) => entry.name.startsWith('hibi:'))
+      .slice(-24)
+      .map((entry) => ({
+        name: entry.name.slice(5, 85),
+        at: Math.round(entry.startTime),
+        ms: Math.round(entry.duration),
+        status: entry.detail?.status,
+      })),
+  }
+}
+
+// Use only after a readiness failure. Keep the original assertion error intact.
+export async function startupDiagnostics(application, page) {
+  const bounded = async (request) => {
+    let timer
+    try {
+      return await Promise.race([
+        request.catch(() => ({ unavailable: true })),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve({ unavailable: true }), 1000)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  const [renderer, main] = await Promise.all([
+    bounded(page.evaluate(startupEntries)),
+    bounded(application.evaluate(startupEntries)),
+  ])
+  return { renderer, main }
+}
+
+export async function waitForDocumentEditor(application, page) {
+  try {
+    await page
+      .getByRole('textbox', { name: 'Document editor', exact: true })
+      .waitFor()
+  } catch (error) {
+    try {
+      console.error(
+        'document editor startup:',
+        JSON.stringify(await startupDiagnostics(application, page)),
+      )
+    } catch {
+      // Preserve the original Playwright failure if diagnostics cannot run.
+    }
+    throw error
+  }
+}
+
 export async function crashAndReload(application) {
   // Drain pending locator disposal before replacing Playwright's debug target.
   await (await application.firstWindow()).evaluate(() => undefined)

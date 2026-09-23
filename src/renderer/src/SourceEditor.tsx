@@ -817,6 +817,7 @@ export function SourceEditor({
     }
   }, [sourceExtensions])
   useEffect(() => {
+    // CodeMirror measures on an animation frame; editing cannot wait for paint.
     ready.current(
       extensionError || languageError
         ? 'failed'

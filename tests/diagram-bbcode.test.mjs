@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, waitForDocumentEditor } from './electron.mjs'
 import { pressShortcut } from './keyboard.mjs'
 
 test('Mermaid and BBCode edit, preview, and export without executing content', {
@@ -32,17 +32,7 @@ test('Mermaid and BBCode edit, preview, and export without executing content', {
     if (message.type() === 'error') console.error(message.text())
   })
   page.setDefaultTimeout(15000)
-  await page
-    .getByRole('textbox', { name: 'Document editor', exact: true })
-    .waitFor({ timeout: 30000 })
-    .catch(async (error) => {
-      const body = await page
-        .locator('body')
-        .innerText()
-        .catch(() => '')
-      console.error(body.slice(0, 1000))
-      throw error
-    })
+  await waitForDocumentEditor(app, page)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
   const open = async (name, source, label) => {
     const path = join(temp, name)
