@@ -433,7 +433,7 @@ export function GraphCanvas({
             current.node.x = current.node.fx
             current.node.y = current.node.fy
             if (matchMedia('(prefers-reduced-motion: reduce)').matches)
-              simulation.current?.tick(30)
+              simulation.current?.tick(layout.nodes.length > 80 ? 2 : 30)
             else simulation.current?.alpha(0.15).restart()
             setLayout((old) => ({ ...old }))
           } else
