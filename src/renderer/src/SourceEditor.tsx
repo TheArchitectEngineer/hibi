@@ -769,6 +769,7 @@ export function SourceEditor({
           write: () => setMeasured(true),
         })
     }
+    measure()
     void window.document.fonts.load('13px "Geist Mono"').then(measure, measure)
     return () => {
       clearReferences('unavailable', false)

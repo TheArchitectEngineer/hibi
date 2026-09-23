@@ -142,6 +142,15 @@ test('large outline follows rich and source carets with bounded rows and ignores
   )
   await rich.evaluate((element) => element.editor.commands.undo())
   await waitForAsync(page, async () => !(await window.hibi.getDocument()).dirty)
+  // Simulate a page with no idle time so outline work must honor its timeout.
+  await page.evaluate(() => {
+    window.requestIdleCallback = (callback, options) =>
+      window.setTimeout(
+        () => callback({ didTimeout: true, timeRemaining: () => 0 }),
+        options?.timeout ?? 500,
+      )
+    window.cancelIdleCallback = (id) => window.clearTimeout(id)
+  })
   await page.getByRole('button', { name: /^source view$/i }).click()
   const source = page.getByRole('textbox', {
     name: 'Markdown editor',

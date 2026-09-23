@@ -129,6 +129,10 @@ test('standalone source skips rich attachment and hidden previews while preservi
     .waitFor()
   await page.waitForFunction(() => window.sourceFormatFixture?.rich === 1)
   await page.getByRole('button', { name: 'Source view', exact: true }).click()
+  // A stalled font load must not leave the source editor inert.
+  await page.evaluate(() => {
+    document.fonts.load = () => new Promise(() => {})
+  })
   await app.evaluate(({ dialog }, file) => {
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] })
   }, file)

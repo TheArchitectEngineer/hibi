@@ -1238,7 +1238,7 @@ export function MarkdownEditor({
     }
     const queue = () => {
       if (typeof requestIdleCallback === 'function')
-        idle = requestIdleCallback(read, { timeout: 500 })
+        idle = requestIdleCallback(read, { timeout: 16 })
       else timer = setTimeout(read, 16)
     }
     const read = () => {
