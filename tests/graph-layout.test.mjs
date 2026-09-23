@@ -145,17 +145,31 @@ test('large graphs fit padded sidebars and expanded views, resize, zoom and filt
   await sidebar
     .getByRole('button', { name: 'Expand graph', exact: true })
     .click()
-  const expanded = page.getByRole('dialog', { name: /^workspace graph$/i })
+  const expanded = page.getByRole('tabpanel', { name: /^workspace graph$/i })
   await fitted(expanded)
   const expandedBox = await expanded.locator('.graph-canvas').boundingBox()
   assert.ok(expandedBox.width > bounds.width)
   await page.screenshot({ path: 'test-results/expanded-workspace-graph.png' })
-  await page.keyboard.press('Escape')
+  const graphTab = page.getByRole('tab', { name: /^workspace graph$/i })
+  await page.getByRole('tab', { name: /^n000\.md$/i }).click()
   await expanded.waitFor({ state: 'hidden' })
+  await graphTab.click()
+  await fitted(expanded)
+  await page.getByRole('button', { name: 'Close Workspace graph' }).click()
+  await graphTab.waitFor({ state: 'detached' })
   await fitted(sidebar)
   const search = sidebar.getByRole('searchbox', { name: /filter graph notes/i })
   await search.fill('n000')
   await fitted(sidebar, 1)
+  await sidebar.getByRole('button', { name: 'Expand graph' }).click()
+  assert.equal(
+    await expanded
+      .getByRole('searchbox', { name: /filter graph notes/i })
+      .inputValue(),
+    'n000',
+  )
+  await fitted(expanded, 1)
+  await page.getByRole('button', { name: 'Close Workspace graph' }).click()
   assert.equal(
     await sidebar.locator('.graph-canvas').getAttribute('data-labels'),
     'true',

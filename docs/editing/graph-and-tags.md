@@ -4,7 +4,7 @@ Enable **Graph** or **Tags** under **Settings → Addons**, then choose it from 
 
 ## Graph
 
-Run **Open workspace graph** to see notes connected by local Markdown links, such as `[Next](notes/next.md)`. Click a node to open and center its note. Drag the background to pan, scroll to zoom, or choose **Expand** for a larger view.
+Run **Open workspace graph** to see notes connected by local Markdown links, such as `[Next](notes/next.md)`. Click a node to open and center its note. Drag the background to pan, scroll to zoom, or choose **Expand** to open a larger graph in a tab.
 
 The graph fits the available space when opened or filtered. **Fit graph** returns to that overview and keeps it fitted as you resize the view. Dense graphs show labels when you zoom in or filter to fewer notes; hover over a node to see its full path.
 

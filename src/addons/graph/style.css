@@ -22,14 +22,11 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
 }
-.graph-expanded-placeholder {
-  aspect-ratio: 1;
+.graph-tab {
+  width: 100%;
+  height: 100%;
 }
-.graph-modal {
-  height: min(65vh, 560px);
-  min-height: 240px;
-}
-.graph-modal .graph-canvas {
+.graph-tab .graph-canvas {
   flex: 1;
   min-height: 0;
   aspect-ratio: auto;

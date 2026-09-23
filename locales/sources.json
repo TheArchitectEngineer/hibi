@@ -4563,7 +4563,6 @@
   ],
   "1ece63d3ba1b": [
     "src/addons/graph/Canvas.tsx",
-    "src/addons/graph/Panel.tsx",
     "src/addons/graph/index.tsx"
   ],
   "919644e3d358": [
