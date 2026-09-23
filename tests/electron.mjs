@@ -9,7 +9,11 @@ export const electron = {
       args: [...options.args, '--hibi-test'],
     })
     const close = application.close.bind(application)
+    let slowStartTimer
+    let closing = false
     application.close = async () => {
+      closing = true
+      clearTimeout(slowStartTimer)
       let timer
       try {
         await Promise.race([
@@ -26,7 +30,7 @@ export const electron = {
       }
     }
     if (process.env.GITHUB_ACTIONS === 'true') {
-      await application.firstWindow()
+      const page = await application.firstWindow()
       await application.evaluate(({ app, BrowserWindow }) => {
         const show = (window) => {
           if (window.webContents.getURL().startsWith('hibi-analysis:')) return
@@ -39,6 +43,33 @@ export const electron = {
         })
         for (const window of BrowserWindow.getAllWindows()) show(window)
       })
+      if (process.platform === 'win32') {
+        slowStartTimer = setTimeout(async () => {
+          if (closing || page.isClosed()) return
+          try {
+            const snapshot = await startupDiagnostics(application, page)
+            if (closing) return
+            const dom = snapshot.renderer.dom
+            if (
+              dom?.settingsOpen ||
+              dom?.sourceMode ||
+              dom?.recoveryOpen ||
+              dom?.editorHidden
+            )
+              return
+            if (
+              (dom?.editable || dom?.sourceEditable) &&
+              dom.editorBusy !== 'true' &&
+              !dom.editorInert
+            )
+              return
+            console.error('slow editor startup:', JSON.stringify(snapshot))
+          } catch {
+            // Diagnostics must not change test results.
+          }
+        }, 4000)
+        slowStartTimer.unref()
+      }
     }
     return application
   },
@@ -47,13 +78,32 @@ export const electron = {
 function startupEntries() {
   const doc = globalThis.document
   const editor = doc?.querySelector('.editor-page')
+  const recovery = doc?.querySelector('.recovery-screen')
   return {
     dom: doc && {
       readyState: doc.readyState,
       editorBusy: editor?.getAttribute('aria-busy'),
       editorInert: editor?.inert,
+      editorHidden: editor?.hidden,
+      settingsOpen: !!doc.querySelector('.settings-screen:not([hidden])'),
+      sourceMode: !!doc.querySelector(
+        '.editor-panes.mode-markdown, .editor-panes.mode-side-by-side',
+      ),
+      recoveryOpen: !!recovery,
+      recovery: recovery && {
+        heading: recovery.querySelector('h1')?.textContent?.slice(0, 120),
+        body: recovery
+          .querySelector('.recovery-content > p')
+          ?.textContent?.slice(0, 160),
+        draftStatus: recovery
+          .querySelector('.recovery-draft span:last-child')
+          ?.textContent?.slice(0, 80),
+      },
       loading: doc.querySelectorAll('.loading-screen').length,
       editable: doc.querySelectorAll('.tiptap[contenteditable="true"]').length,
+      sourceEditable: doc.querySelectorAll(
+        '.cm-content[contenteditable="true"]',
+      ).length,
     },
     stages: performance
       .getEntries()
@@ -83,11 +133,27 @@ export async function startupDiagnostics(application, page) {
       clearTimeout(timer)
     }
   }
-  const [renderer, main] = await Promise.all([
+  const [renderer, main, consoleErrors, pageErrors] = await Promise.all([
     bounded(page.evaluate(startupEntries)),
     bounded(application.evaluate(startupEntries)),
+    bounded(
+      page.consoleMessages().then((messages) =>
+        messages
+          .filter((message) => message.type() === 'error')
+          .slice(-3)
+          .map((message) => message.text().slice(0, 800)),
+      ),
+    ),
+    bounded(
+      page.pageErrors().then((errors) =>
+        errors.slice(-3).map((error) => ({
+          message: error.message.slice(0, 800),
+          stack: error.stack?.slice(0, 800),
+        })),
+      ),
+    ),
   ])
-  return { renderer, main }
+  return { renderer, main, consoleErrors, pageErrors }
 }
 
 export async function waitForDocumentEditor(application, page) {
