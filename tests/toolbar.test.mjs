@@ -8,6 +8,50 @@ import { clickMenu, pressShortcut } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 import { uiName } from './ui.mjs'
 
+test('addon actions follow formatting by default and keep custom toolbar order', {
+  timeout: 30000,
+}, async (t) => {
+  const profile = await mkdtemp(join(tmpdir(), 'hibi-toolbar-addon-order-'))
+  const app = await electron.launch({
+    args: [resolve('.'), `--user-data-dir=${profile}`],
+  })
+  t.after(async () => {
+    await app.close()
+    await rm(profile, { recursive: true, force: true })
+  })
+  const page = await app.firstWindow()
+  page.setDefaultTimeout(7000)
+  await page.evaluate(() => window.hibi.setAddonEnabled('tags', true))
+  await page.reload()
+  await clickMenu(app, 'Settings')
+  await page.getByRole('tab', { name: /^appearance$/i }).click()
+  await page.locator('.toolbar-order summary').click()
+  const order = page.locator('.toolbar-order li')
+  const ids = () =>
+    order.evaluateAll((items) => items.map((item) => item.dataset.toolbarId))
+  await page.locator('.toolbar-order [data-toolbar-id="tags.browse"]').waitFor()
+  assert.equal((await ids()).at(-1), 'tags.browse')
+  await page
+    .locator('.toolbar-order [data-toolbar-id="format.bold"] button')
+    .click()
+  await page.getByRole('button', { name: /^move bold later$/i }).click()
+  assert.equal((await ids()).at(-1), 'tags.browse')
+  await page
+    .locator('.toolbar-order [data-toolbar-id="tags.browse"] button')
+    .click()
+  await page
+    .getByRole('button', { name: /^move browse tags earlier$/i })
+    .click()
+  assert.equal((await ids()).at(-2), 'tags.browse')
+  await page.reload()
+  await clickMenu(app, 'Settings')
+  await page.getByRole('tab', { name: /^appearance$/i }).click()
+  await page.locator('.toolbar-order summary').click()
+  assert.equal((await ids()).at(-2), 'tags.browse')
+  await page.getByRole('button', { name: /^reset order$/i }).click()
+  assert.equal((await ids()).at(-1), 'tags.browse')
+})
+
 test('toolbar auto-hide defaults on, shares top-bar timing, and moves content smoothly', {
   timeout: 30000,
 }, async (t) => {

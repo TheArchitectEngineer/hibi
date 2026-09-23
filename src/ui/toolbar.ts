@@ -5,7 +5,7 @@ export type ToolbarPreferences = {
   /** Defaults to true; uses the same typing/idle signal as the top bar. */
   autoHide?: boolean
   mode: 'icons' | 'icons-and-text' | 'text'
-  /** Fully qualified item ids; omitted/new items retain registration order. */
+  /** Fully qualified item ids; omitted/new actions follow formatting actions in registration order. */
   order?: readonly string[]
   /** Fully qualified item IDs. Omitted items use the toolbar; menu items always stay in the dropdown. */
   placements?: Readonly<Record<string, 'toolbar' | 'menu' | 'hidden'>>
