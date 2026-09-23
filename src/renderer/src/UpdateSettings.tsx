@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import { errorMessage } from '../../shared/errors'
 import type { UpdateChannel, UpdateState } from '../../shared/updates'
 import { Button, Select, SettingRow } from '../../ui/Controls'
@@ -40,6 +40,8 @@ export function UpdateSettings() {
     !state ||
     state.status === 'checking' ||
     state.status === 'downloading'
+  const downloading = state?.status === 'downloading'
+  const progress = Math.max(0, Math.min(100, Math.floor(state?.progress ?? 0)))
   return (
     <>
       <h2>Updates</h2>
@@ -82,7 +84,7 @@ export function UpdateSettings() {
         </SettingRow>
         <SettingRow
           id="install-update"
-          label={state?.version ? `Version ${state.version}` : 'Update status'}
+          label="Update status"
           description={
             <span
               role={error || state?.status === 'error' ? 'alert' : 'status'}
@@ -90,21 +92,37 @@ export function UpdateSettings() {
               {error || state?.message || 'Loading update settings…'}
               {state?.broken &&
                 ' This nightly failed required checks and may be broken.'}
-              {state?.status === 'downloading' && ` ${state.progress ?? 0}%`}
             </span>
           }
         >
           {state?.version &&
-            (state.status === 'available' || state.status === 'error') && (
+            (state.status === 'available' ||
+              state.status === 'error' ||
+              downloading) && (
               <Button
                 id="install-update"
-                aria-label="Download update"
+                aria-label={
+                  downloading ? `Downloading ${progress}%` : 'Download update'
+                }
+                className="update-download-button"
+                style={
+                  downloading
+                    ? ({
+                        '--download-progress': `${progress}%`,
+                      } as CSSProperties)
+                    : undefined
+                }
                 disabled={waiting}
                 onClick={() => void run(() => window.hibi.downloadUpdate())}
               >
-                Download update
+                {downloading ? `Downloading ${progress}%` : 'Download update'}
               </Button>
             )}
+          {downloading && (
+            <span className="update-progress-status" role="status">
+              Downloading {Math.floor(progress / 10) * 10}%
+            </span>
+          )}
           {state?.status === 'downloaded' && (
             <Button
               id="install-update"

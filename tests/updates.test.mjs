@@ -272,6 +272,10 @@ test('mac pins both signed ZIPs, installs after close confirmation, and persists
   const { mock } = manager
   assert.equal(manager.getUpdateState().channel, 'nightly-green')
   assert.equal((await manager.checkForUpdates()).status, 'available')
+  assert.equal(
+    manager.getUpdateState().message,
+    `An update is available: ${version}`,
+  )
   assert.match(mock.requests[0], /nightly-green\/update.json$/)
   mock.badMetadata = true
   assert.equal((await manager.downloadUpdate()).status, 'error')
@@ -280,6 +284,10 @@ test('mac pins both signed ZIPs, installs after close confirmation, and persists
   await assert.rejects(manager.installUpdate(), /Download an update/)
   mock.badMetadata = false
   assert.equal((await manager.downloadUpdate()).status, 'downloaded')
+  assert.equal(
+    manager.getUpdateState().message,
+    `An update is available: ${version}`,
+  )
   assert.match(mock.feed.url, new RegExp(`${tag}/$`))
   assert.equal(mock.downloads, 1)
   await manager.setUpdateChannel('nightly')
@@ -423,7 +431,7 @@ test('update settings expose both channels, persist choice, and fit narrow windo
         .isDisabled(),
       true,
     )
-    const showUpdate = (status, progress) =>
+    const showUpdate = (status, progress, broken = false) =>
       app.evaluate(
         ({ BrowserWindow }, update) => {
           BrowserWindow.getAllWindows()[0].webContents.send(
@@ -436,20 +444,51 @@ test('update settings expose both channels, persist choice, and fit narrow windo
           status,
           supported: true,
           version,
-          broken: true,
+          broken,
           progress,
-          message:
-            'An update is available. Save and back up your documents before installing.',
+          message: `An update is available: ${version}`,
         },
       )
+    await showUpdate('available', 0)
+    assert.equal(
+      await page.locator('#install-update-description').textContent(),
+      `An update is available: ${version}`,
+    )
     await showUpdate('downloading', 50)
-    await page.getByRole('status').filter({ hasText: '50%' }).waitFor()
+    const download = page.getByRole('button', {
+      name: 'Downloading 50%',
+      exact: true,
+    })
+    await download.waitFor()
+    assert.equal(await download.isDisabled(), true)
+    assert.equal(
+      await download.evaluate((element) =>
+        getComputedStyle(element).backgroundImage.includes('50%'),
+      ),
+      true,
+    )
+    assert.equal(
+      await page.locator('#install-update-description').textContent(),
+      `An update is available: ${version}`,
+    )
     assert.equal(await picker.isDisabled(), true)
+    for (const width of [480, 1000]) {
+      await page.setViewportSize({ width, height: 760 })
+      await mkdir('test-results', { recursive: true })
+      await page.screenshot({
+        path: `test-results/update-downloading-${width}.png`,
+        animations: 'disabled',
+      })
+    }
+    await showUpdate('downloading', 75)
+    await page
+      .getByRole('button', { name: 'Downloading 75%', exact: true })
+      .waitFor()
     await showUpdate('downloaded', 100)
     await page
       .getByRole('button', { name: 'Restart and install', exact: true })
       .waitFor()
-    await showUpdate('available', 0)
+    await showUpdate('available', 0, true)
     await page
       .getByRole('button', { name: 'Download update', exact: true })
       .waitFor()

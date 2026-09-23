@@ -187,7 +187,7 @@
   "480347cad7e2": [
     "src/main/sideload.ts"
   ],
-  "8cec94394c0f": [
+  "521da6c33a93": [
     "src/main/updates.ts"
   ],
   "7809d2e43901": [
@@ -1165,11 +1165,14 @@
   "f0b0738f75b8": [
     "src/addons/math/PackageSettings.tsx"
   ],
-  "b99a39070daf": [
-    "src/main/updates.ts"
+  "37b345555d7e": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "9c9c27064963": [
     "src/addons/math/PackageSettings.tsx"
+  ],
+  "7cdffb6338bf": [
+    "src/renderer/src/UpdateSettings.tsx"
   ],
   "ad23f434e670": [
     "src/main/media.ts"
@@ -3969,9 +3972,6 @@
   "00212361daf3": [
     "src/shared/updates.ts"
   ],
-  "a7f5b261c62c": [
-    "src/main/updates.ts"
-  ],
   "b22c9541adab": [
     "src/main/updates.ts"
   ],
@@ -4498,9 +4498,6 @@
   ],
   "3945c0a1fc3c": [
     "src/renderer/src/VersionHistory.tsx"
-  ],
-  "562001872cce": [
-    "src/renderer/src/UpdateSettings.tsx"
   ],
   "dcc839a4015c": [
     "src/main/index.ts"

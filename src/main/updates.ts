@@ -171,8 +171,7 @@ export function checkForUpdates() {
       status: 'available',
       version: candidate.version,
       broken: candidate.status === 'nightly-broken',
-      message:
-        'An update is available. Save and back up your documents before installing.',
+      message: `An update is available: ${candidate.version}`,
     })
     for (const window of BrowserWindow.getAllWindows())
       window.webContents.send(
@@ -207,7 +206,7 @@ export function downloadUpdate() {
     publish({
       status: 'downloading',
       progress: 0,
-      message: 'Downloading update…',
+      message: `An update is available: ${release.version}`,
     })
     const base = `${UPDATE_URL}${release.tag}/`
     const client = await desktopUpdater()
@@ -249,7 +248,7 @@ export function downloadUpdate() {
     publish({
       status: 'downloaded',
       progress: 100,
-      message: 'The update is ready. Restart Hibi to install it.',
+      message: `An update is available: ${release.version}`,
     })
   })
 }
