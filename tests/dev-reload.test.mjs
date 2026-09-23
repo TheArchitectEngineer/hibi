@@ -76,6 +76,13 @@ test('development watches renderer, preload, addons, and documentation generatio
   }
   child.stdout.on('data', collect)
   child.stderr.on('data', collect)
+  const lifecycle = []
+  const record = (event) => {
+    lifecycle.push(event)
+    if (lifecycle.length > 8) lifecycle.shift()
+  }
+  child.on('exit', (code, signal) => record(`dev exited: ${code ?? signal}`))
+  child.on('error', (error) => record(`dev error: ${error.message}`))
   let browser
   t.after(async () => {
     if (process.platform === 'win32') {
@@ -122,7 +129,10 @@ test('development watches renderer, preload, addons, and documentation generatio
   browser = await chromium.connectOverCDP(
     output.match(/DevTools listening on (ws:\/\/\S+)/)[1],
   )
+  browser.on('disconnected', () => record('cdp disconnected'))
   const page = browser.contexts()[0].pages()[0]
+  page.on('close', () => record('page closed'))
+  page.on('crash', () => record('page crashed'))
   page.setDefaultTimeout(30000)
   await page.locator('[data-status-id="typing-speed.wpm"]').waitFor()
   assert.equal(
@@ -218,7 +228,16 @@ test('development watches renderer, preload, addons, and documentation generatio
   )
   t.diagnostic('documentation generator updated')
   await page.evaluate(() => window.hibi.setAddonEnabled('diagnostics', false))
-  await page.reload()
+  try {
+    await page.reload()
+  } catch (error) {
+    t.diagnostic(
+      `reload state: dev exit=${child.exitCode ?? 'running'}, signal=${child.signalCode ?? 'none'}, page closed=${page.isClosed()}, cdp connected=${browser.isConnected()}`,
+    )
+    t.diagnostic(`lifecycle: ${lifecycle.join('; ') || 'none'}`)
+    t.diagnostic(`dev output tail:\n${output.slice(-3000)}`)
+    throw error
+  }
   assert.equal(
     await page.evaluate(
       async () =>
