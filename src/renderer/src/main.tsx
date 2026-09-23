@@ -223,6 +223,7 @@ function App() {
   }, [needsRichEditor, richEditor])
   const DocumentEditor = markdownDocument ? richEditor.Component : FormatEditor
   useLayoutEffect(() => {
+    startupMark('app-layout-effect')
     editorDocument.publish(documentRuntime.get() ?? document)
   }, [document])
   const currentDocument = useRef(document)
