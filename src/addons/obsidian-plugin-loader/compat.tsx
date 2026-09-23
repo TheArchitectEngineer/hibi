@@ -4,7 +4,7 @@ import type { Editor as RichEditor } from '@tiptap/core'
 import { Puzzle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { AddonContext } from '../api'
-import type { ObsidianPluginManifest } from './package'
+import type { ObsidianPluginManifest, ObsidianVaultFile } from './package'
 
 type ObsidianElement = HTMLElement & {
   empty: () => void
@@ -118,6 +118,9 @@ export function createObsidianApi(
   context: AddonContext,
   manifest: ObsidianPluginManifest,
   bridge: EditorBridge,
+  vaultName: string,
+  workspaceId: string | null,
+  initialFiles: ObsidianVaultFile[],
   onSettings: (
     tab: {
       containerEl: HTMLElement
@@ -129,6 +132,123 @@ export function createObsidianApi(
   const editor = editorApi(context, bridge)
   const pluginId = manifest.id.replace(/[^a-z0-9-]/g, '-')
   let nextItem = 0
+  const lastRead = new Map<string, string>()
+  const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
+
+  class TFile {
+    path: string
+    stat: ObsidianVaultFile['stat']
+    constructor(file: ObsidianVaultFile) {
+      this.path = file.path
+      this.stat = file.stat
+    }
+    get name() {
+      return this.path.split('/').at(-1) ?? ''
+    }
+    get extension() {
+      return this.name.split('.').at(-1) ?? ''
+    }
+    get basename() {
+      return this.name.slice(0, -(this.extension.length + 1))
+    }
+  }
+
+  const files = new Map(
+    initialFiles.map((file) => [file.path, new TFile(file)]),
+  )
+
+  const vault = {
+    getName: () => vaultName,
+    getMarkdownFiles: () => [...files.values()],
+    getFiles: () => [...files.values()],
+    getAllLoadedFiles: () => [...files.values()],
+    getFileByPath: (path: string) => files.get(path) ?? null,
+    getAbstractFileByPath: (path: string) => files.get(path) ?? null,
+    async read(file: TFile) {
+      const source = await context.native.query<string>('vaultRead', {
+        workspaceId,
+        path: file.path,
+      })
+      lastRead.set(file.path, source)
+      return source
+    },
+    async cachedRead(file: TFile) {
+      return this.read(file)
+    },
+    async create(path: string, content: string) {
+      const created = await context.native.invoke<string>('vaultCreate', {
+        workspaceId,
+        path,
+        content,
+      })
+      const file = new TFile({
+        path: created,
+        stat: { ctime: Date.now(), mtime: Date.now(), size: content.length },
+      })
+      files.set(created, file)
+      lastRead.set(created, content)
+      for (const listener of listeners.get('create') ?? []) listener(file)
+      return file
+    },
+    async modify(file: TFile, content: string) {
+      await context.native.invoke('vaultModify', {
+        workspaceId,
+        path: file.path,
+        content,
+        expected: lastRead.get(file.path),
+      })
+      lastRead.set(file.path, content)
+      const stored = files.get(file.path)
+      if (stored) {
+        stored.stat.mtime = Date.now()
+        stored.stat.size = content.length
+      }
+      for (const listener of listeners.get('modify') ?? []) listener(file)
+    },
+    async process(file: TFile, transform: (content: string) => string) {
+      const before = await this.read(file)
+      const after = transform(before)
+      if (typeof after !== 'string')
+        throw new Error(
+          'Vault.process must return Markdown text synchronously.',
+        )
+      await this.modify(file, after)
+      return after
+    },
+    async rename(file: TFile, destination: string) {
+      const oldPath = file.path
+      const path = await context.native.invoke<string>('vaultRename', {
+        workspaceId,
+        path: oldPath,
+        destination,
+      })
+      const stored = files.get(oldPath)
+      files.delete(oldPath)
+      lastRead.delete(oldPath)
+      file.path = path
+      if (stored) files.set(path, stored)
+      for (const listener of listeners.get('rename') ?? [])
+        listener(file, oldPath)
+    },
+    async trash(file: TFile) {
+      await context.native.invoke('vaultTrash', {
+        workspaceId,
+        path: file.path,
+      })
+      files.delete(file.path)
+      lastRead.delete(file.path)
+      for (const listener of listeners.get('delete') ?? []) listener(file)
+    },
+    async delete(file: TFile) {
+      return this.trash(file)
+    },
+    on(name: string, callback: (...args: unknown[]) => void) {
+      const subscribers = listeners.get(name) ?? new Set()
+      subscribers.add(callback)
+      listeners.set(name, subscribers)
+      return { off: () => subscribers.delete(callback) }
+    },
+  }
 
   class Component {
     private cleanups: (() => void)[] = []
@@ -148,6 +268,9 @@ export function createObsidianApi(
     registerInterval(timer: number) {
       this.register(() => clearInterval(timer))
       return timer
+    }
+    registerEvent(ref: { off: () => void }) {
+      this.register(() => ref.off())
     }
     unload() {
       try {
@@ -174,6 +297,7 @@ export function createObsidianApi(
   }
 
   const app = {
+    vault,
     workspace: {
       getActiveViewOfType(type: unknown) {
         return type === MarkdownView && context.editor.getDocument()
@@ -372,6 +496,7 @@ export function createObsidianApi(
       MarkdownView,
       PluginSettingTab,
       Setting,
+      TFile,
     },
   }
 }

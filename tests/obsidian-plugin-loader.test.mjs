@@ -12,8 +12,11 @@ test('loads a browser Obsidian plugin through its bundled Hibi addon', {
   const root = await mkdtemp(join(tmpdir(), 'hibi-obsidian-e2e-'))
   const profile = join(root, 'profile')
   const source = join(root, 'sample-plugin')
+  const workspace = join(root, 'notes')
   await mkdir(profile)
   await mkdir(source)
+  await mkdir(workspace)
+  await writeFile(join(workspace, 'Note.md'), '# note')
   await writeFile(
     join(profile, 'addons.json'),
     JSON.stringify({ 'obsidian-plugin-loader': true }),
@@ -55,6 +58,13 @@ module.exports = class Sample extends Plugin {
     this.addRibbonIcon('dice', 'Sample action', () => new Notice('Sample clicked'));
     this.addStatusBarItem().setText('sample ready');
     this.addCommand({ id: 'open-modal', name: 'Open sample modal', callback: () => new SampleModal(this.app).open() });
+    this.addCommand({ id: 'edit-vault', name: 'Edit sample vault', callback: async () => {
+      const file = this.app.vault.getFileByPath('Note.md');
+      window.sampleVaultBefore = await this.app.vault.read(file);
+      await this.app.vault.process(file, (text) => text + '\\nfrom plugin');
+      await this.app.vault.create('Created.md', '# created');
+      window.sampleVaultDone = this.app.vault.getMarkdownFiles().length;
+    } });
     this.addSettingTab(new SampleSettings(this.app, this));
     window.sampleLoads = (window.sampleLoads || 0) + 1;
   }
@@ -69,17 +79,22 @@ module.exports = class Sample extends Plugin {
     await rm(root, { recursive: true, force: true })
   })
   await app.evaluate(({ dialog }, selected) => {
+    globalThis.obsidianSelectedFolder = selected
     dialog.showOpenDialog = async () => ({
       canceled: false,
-      filePaths: [selected],
+      filePaths: [globalThis.obsidianSelectedFolder],
     })
     dialog.showMessageBox = async () => ({ response: 1 })
-  }, source)
+  }, workspace)
   const page = await app.firstWindow()
   page.setDefaultTimeout(10000)
   await page
     .getByRole('textbox', { name: 'Document editor', exact: true })
     .waitFor()
+  await page.evaluate(() => window.hibi.openWorkspace())
+  await app.evaluate((_electron, selected) => {
+    globalThis.obsidianSelectedFolder = selected
+  }, source)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
   async function command(name) {
     await pressShortcut(app, `${mod}+k`)
@@ -103,6 +118,42 @@ module.exports = class Sample extends Plugin {
   await enable.click()
   await page.waitForFunction(() => window.sampleLoads === 1)
   await page.getByText('sample ready', { exact: true }).waitFor()
+  await command('Edit sample vault')
+  await page.waitForFunction(() => window.sampleVaultDone === 2)
+  assert.equal(await page.evaluate(() => window.sampleVaultBefore), '# note')
+  assert.equal(
+    await readFile(join(workspace, 'Note.md'), 'utf8'),
+    '# note\nfrom plugin',
+  )
+  assert.equal(
+    await readFile(join(workspace, 'Created.md'), 'utf8'),
+    '# created',
+  )
+  await assert.rejects(
+    page.evaluate(async () =>
+      window.hibi.invokeAddon('obsidian-plugin-loader', 'vaultCreate', {
+        workspaceId: (await window.hibi.getWorkspace()).id,
+        path: '../escape.md',
+        content: 'no',
+      }),
+    ),
+  )
+  await writeFile(join(workspace, 'Note.md'), '# external edit')
+  await assert.rejects(
+    page.evaluate(async () =>
+      window.hibi.invokeAddon('obsidian-plugin-loader', 'vaultModify', {
+        workspaceId: (await window.hibi.getWorkspace()).id,
+        path: 'Note.md',
+        expected: '# note\nfrom plugin',
+        content: '# stale overwrite',
+      }),
+    ),
+    /changed since the plugin read it/,
+  )
+  assert.equal(
+    await readFile(join(workspace, 'Note.md'), 'utf8'),
+    '# external edit',
+  )
   await command('Open sample modal')
   await page.getByText('sample modal opened', { exact: true }).waitFor()
   await page.getByRole('dialog').getByRole('button', { name: /close/i }).click()

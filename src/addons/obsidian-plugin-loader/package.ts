@@ -16,6 +16,11 @@ export type InstalledObsidianPlugin = {
   styleUrl: string | null
 }
 
+export type ObsidianVaultFile = {
+  path: string
+  stat: { ctime: number; mtime: number; size: number }
+}
+
 const text = (value: unknown, limit: number) =>
   typeof value === 'string' && value.trim() && value.length <= limit
     ? value.trim()

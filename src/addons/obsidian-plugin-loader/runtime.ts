@@ -5,7 +5,7 @@ import {
   registerEditorBridge,
   showPluginSettings,
 } from './compat'
-import type { InstalledObsidianPlugin } from './package'
+import type { InstalledObsidianPlugin, ObsidianVaultFile } from './package'
 
 type PluginInstance = {
   onload: () => void | Promise<void>
@@ -82,10 +82,19 @@ export class ObsidianPluginRuntime {
     if (!plugin.enabled) throw new Error('Enable this plugin first.')
     const identity = `${plugin.manifest.id}:${plugin.hash}`
     let settingTab: ActivePlugin['settingTab'] = null
+    const workspace = await this.context.workspace.get()
+    const files = workspace?.id
+      ? await this.context.native.query<ObsidianVaultFile[]>('vaultList', {
+          workspaceId: workspace.id,
+        })
+      : []
     const { app, api } = createObsidianApi(
       this.context,
       plugin.manifest,
       this.bridge,
+      workspace?.name ?? '',
+      workspace?.id ?? null,
+      files,
       (tab) => {
         settingTab = tab
         const active = this.active.get(plugin.manifest.id)

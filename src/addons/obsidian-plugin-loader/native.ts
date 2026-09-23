@@ -10,6 +10,14 @@ import {
   setObsidianPluginEnabled,
   writeObsidianPluginData,
 } from './store'
+import {
+  vaultCreate,
+  vaultList,
+  vaultModify,
+  vaultRead,
+  vaultRename,
+  vaultTrash,
+} from './vault'
 
 export const obsidianPluginRoot = () =>
   join(app.getPath('userData'), 'obsidian-plugins')
@@ -30,6 +38,8 @@ export default {
     list: async () => listObsidianPlugins(obsidianPluginRoot()),
     data: async (input) =>
       readObsidianPluginData(obsidianPluginRoot(), idFrom(input)),
+    vaultList,
+    vaultRead,
   },
   methods: {
     async install() {
@@ -78,5 +88,9 @@ export default {
       const path = await installedObsidianPluginPath(obsidianPluginRoot(), id)
       await shell.trashItem(path)
     },
+    vaultCreate,
+    vaultModify,
+    vaultRename,
+    vaultTrash,
   },
 } satisfies NativeAddon
