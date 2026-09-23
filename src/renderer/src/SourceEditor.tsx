@@ -419,6 +419,7 @@ export function SourceEditor({
     const active = documentRuntime.get()
     if (
       !active ||
+      documentRuntime.session() !== session ||
       active.tabId !== document.tabId ||
       active.revision !== document.revision
     )
