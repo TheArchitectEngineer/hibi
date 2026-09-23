@@ -10,13 +10,15 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force'
 import { Focus, Maximize2, Minus, Plus } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { IconButton } from '../../ui/Controls'
 import type { noteGraph } from './model'
+import { defaultZoom } from './preferences'
 
 type Node = ReturnType<typeof noteGraph>['nodes'][number] & SimulationNodeDatum
 type Edge = { source: Node; target: Node }
 type View = { x: number; y: number; scale: number; centered: string | null }
+type Camera = View | 'default' | null
 type Size = { width: number; height: number }
 const radius = (node: Node) => 5 + Math.min(7, Math.sqrt(node.degree) * 2)
 const label = (node: Node) => {
@@ -26,8 +28,14 @@ const label = (node: Node) => {
     : node.label
 }
 
-function cameraPosition(view: View | null, nodes: Node[], size: Size): View {
-  if (!view) {
+function cameraPosition(
+  view: Camera,
+  nodes: Node[],
+  size: Size,
+  focus: string | null,
+  zoom: number,
+): View {
+  if (!view || view === 'default') {
     if (!nodes.length) return { x: 0, y: 0, scale: 1, centered: null }
     let left = Infinity,
       right = -Infinity,
@@ -58,11 +66,20 @@ function cameraPosition(view: View | null, nodes: Node[], size: Size): View {
       Math.max(1, size.width - 64) / Math.max(1, right - left),
       Math.max(1, size.height - 64) / Math.max(1, bottom - top),
     )
-    return {
+    const fitted = {
       scale,
       centered: null,
       x: (-(left + right) / 2) * scale,
       y: (-(top + bottom) / 2) * scale,
+    }
+    if (view !== 'default') return fitted
+    const closeScale = Math.min(4, scale * zoom)
+    const node = nodes.find((item) => item.id === focus)
+    return {
+      scale: closeScale,
+      centered: node?.id ?? null,
+      x: node ? -(node.x ?? 0) * closeScale : (fitted.x * closeScale) / scale,
+      y: node ? -(node.y ?? 0) * closeScale : (fitted.y * closeScale) / scale,
     }
   }
   const node = nodes.find((node) => node.id === view.centered)
@@ -79,18 +96,41 @@ export function GraphCanvas({
   active,
   open,
   expand,
+  resetKey,
 }: {
   graph: ReturnType<typeof noteGraph>
   active: string | null
   open: (path: string) => void
   expand?: (() => void) | undefined
+  resetKey: string
 }) {
   const svg = useRef<SVGSVGElement>(null)
   const simulation = useRef<Simulation<Node, undefined> | null>(null)
   const [size, setSize] = useState({ width: 640, height: 400 })
-  // Null keeps the overview fitted while the layout settles or the viewport resizes.
-  const [view, setView] = useState<View | null>(null)
-  const previousSelection = useRef({ graph, active })
+  // Null is the fitted overview; 'default' applies the saved starting zoom.
+  const [view, setView] = useState<Camera>('default')
+  const [initialZoom] = useState(defaultZoom)
+  const initialTarget = useRef(active)
+  const currentView = useRef(view)
+  currentView.current = view
+  const animation = useRef<number | null>(null)
+  const previousSelection = useRef(active)
+  const previousResetKey = useRef(resetKey)
+  const camera = useCallback(
+    (value: Camera, nodes: Node[], dimensions: Size) =>
+      cameraPosition(
+        value,
+        nodes,
+        dimensions,
+        initialTarget.current,
+        initialZoom,
+      ),
+    [initialZoom],
+  )
+  const stopAnimation = useCallback(() => {
+    if (animation.current !== null) cancelAnimationFrame(animation.current)
+    animation.current = null
+  }, [])
   const [layout, setLayout] = useState<{ nodes: Node[]; edges: Edge[] }>({
     nodes: [],
     edges: [],
@@ -120,15 +160,15 @@ export function GraphCanvas({
     resize.observe(element)
     const wheel = (event: WheelEvent) => {
       event.preventDefault()
+      stopAnimation()
       const bounds = element.getBoundingClientRect()
       const x = event.clientX - bounds.left - bounds.width / 2
       const y = event.clientY - bounds.top - bounds.height / 2
       setView((old) => {
-        const position = cameraPosition(
-          old,
-          simulation.current?.nodes() ?? [],
-          { width: element.clientWidth, height: element.clientHeight },
-        )
+        const position = camera(old, simulation.current?.nodes() ?? [], {
+          width: element.clientWidth,
+          height: element.clientHeight,
+        })
         const scale = Math.max(
           Math.min(0.01, position.scale),
           Math.min(4, position.scale * Math.exp(-event.deltaY * 0.002)),
@@ -146,7 +186,7 @@ export function GraphCanvas({
       resize.disconnect()
       element.removeEventListener('wheel', wheel)
     }
-  }, [])
+  }, [camera, stopAnimation])
   useEffect(() => {
     const nodes: Node[] = graph.nodes.map((node) => ({ ...node }))
     const links = graph.edges.map((edge) => ({ ...edge }))
@@ -171,32 +211,63 @@ export function GraphCanvas({
       engine.on('tick', publish)
       publish()
     }
-    setView(null)
     return () => {
       engine.stop()
       simulation.current = null
     }
   }, [graph])
   useEffect(() => {
-    const previous = previousSelection.current
-    previousSelection.current = { graph, active }
-    if (previous.graph === graph && previous.active !== active) {
-      if (active && graph.nodes.some((node) => node.id === active))
-        setView((old) => ({
-          ...cameraPosition(old, simulation.current?.nodes() ?? [], size),
-          centered: active,
-        }))
-      else setView(null)
+    if (previousResetKey.current === resetKey) return
+    previousResetKey.current = resetKey
+    initialTarget.current = active
+    stopAnimation()
+    setView('default')
+  }, [resetKey, active, stopAnimation])
+  useEffect(() => {
+    if (previousSelection.current === active) return
+    previousSelection.current = active
+    const nodes = simulation.current?.nodes() ?? []
+    if (!active || !nodes.some((node) => node.id === active)) return
+    const from = camera(currentView.current, nodes, size)
+    const target = () =>
+      simulation.current?.nodes().find((node) => node.id === active)
+    stopAnimation()
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const node = target()!
+      setView({
+        ...from,
+        x: -(node.x ?? 0) * from.scale,
+        y: -(node.y ?? 0) * from.scale,
+        centered: active,
+      })
+      return
     }
-  }, [active, graph, size])
-  const position = cameraPosition(view, layout.nodes, size)
+    const start = performance.now()
+    const step = (now: number) => {
+      const node = target()
+      if (!node) return
+      const progress = Math.min(1, (now - start) / 320)
+      const eased = 1 - (1 - progress) ** 3
+      setView({
+        ...from,
+        x: from.x + (-(node.x ?? 0) * from.scale - from.x) * eased,
+        y: from.y + (-(node.y ?? 0) * from.scale - from.y) * eased,
+        centered: progress === 1 ? active : null,
+      })
+      animation.current = progress < 1 ? requestAnimationFrame(step) : null
+    }
+    animation.current = requestAnimationFrame(step)
+  }, [active, size, camera, stopAnimation])
+  useEffect(() => () => stopAnimation(), [stopAnimation])
+  const position = camera(view, layout.nodes, size)
   function activate(node: Node) {
-    setView({ ...position, centered: node.id })
+    if (node.id === active) setView({ ...position, centered: node.id })
     open(node.id)
   }
   function zoom(factor: number) {
+    stopAnimation()
     setView((old) => {
-      const current = cameraPosition(old, layout.nodes, size)
+      const current = camera(old, layout.nodes, size)
       const scale = Math.max(
         Math.min(0.01, current.scale),
         Math.min(4, current.scale * factor),
@@ -240,6 +311,7 @@ export function GraphCanvas({
           const step = steps[event.key]
           if (step) {
             event.preventDefault()
+            stopAnimation()
             setView({
               ...position,
               centered: null,
@@ -250,6 +322,8 @@ export function GraphCanvas({
         }}
         onPointerDown={(event) => {
           if (event.button !== 0) return
+          event.preventDefault()
+          stopAnimation()
           setView({ ...position, centered: null })
           const id =
             event.target instanceof Element
@@ -296,7 +370,7 @@ export function GraphCanvas({
             setLayout((old) => ({ ...old }))
           } else
             setView((old) => {
-              const current = cameraPosition(old, layout.nodes, size)
+              const current = camera(old, layout.nodes, size)
               return { ...current, x: current.x + dx, y: current.y + dy }
             })
         }}
@@ -357,7 +431,13 @@ export function GraphCanvas({
         <IconButton aria-label="Zoom out" onClick={() => zoom(1 / 1.25)}>
           <Minus size={16} />
         </IconButton>
-        <IconButton aria-label="Fit graph" onClick={() => setView(null)}>
+        <IconButton
+          aria-label="Fit graph"
+          onClick={() => {
+            stopAnimation()
+            setView(null)
+          }}
+        >
           <Focus size={16} />
         </IconButton>
       </div>

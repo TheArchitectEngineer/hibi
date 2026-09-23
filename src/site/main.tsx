@@ -766,7 +766,12 @@ export function startSite(workspace: SiteData, root: Root) {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <GraphCanvas graph={graph} active={active} open={open} />
+        <GraphCanvas
+          graph={graph}
+          active={active}
+          open={open}
+          resetKey={query}
+        />
       </div>
     )
   }

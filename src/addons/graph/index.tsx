@@ -1,10 +1,14 @@
 import { Network } from 'lucide-react'
+import { lazy } from 'react'
 import { defineAddon } from '../api'
 import manifest from './manifest'
 import { GraphPanel } from './Panel'
 import css from './style.css?inline'
 export default defineAddon({
   manifest,
+  Settings: lazy(() =>
+    import('./Settings').then(({ Settings }) => ({ default: Settings })),
+  ),
   start(context) {
     context.styles.register('graph', css)
     const expanded = context.views.register({

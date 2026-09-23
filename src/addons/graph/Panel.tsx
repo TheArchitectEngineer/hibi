@@ -114,6 +114,7 @@ export function GraphPanel({
               graph={graph}
               active={workspace.activePath}
               open={open}
+              resetKey={`${workspace.id ?? workspace.name}:${query}`}
               expand={onExpand ? () => onExpand(query) : undefined}
             />
           ) : (

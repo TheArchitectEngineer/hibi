@@ -23,8 +23,10 @@
   border-radius: var(--radius-control);
 }
 .graph-tab {
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
+  padding: var(--space-4);
 }
 .graph-tab .graph-canvas {
   flex: 1;
