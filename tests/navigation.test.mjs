@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, waitForDocumentEditor } from './electron.mjs'
 import { clickMenu, pressShortcut, replaceRichText } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 
@@ -57,7 +57,7 @@ test('shift-click links, note/settings history, and file-menu remote imports', {
     join(root, 'a.md'),
   )
   const rich = page.getByRole('textbox', { name: /document editor/i })
-  await rich.waitFor()
+  await waitForDocumentEditor(app, page)
   await pressShortcut(app, `${mod}+o`)
   await rich.getByRole('link', { name: /^next$/i, exact: true }).waitFor()
   await rich
