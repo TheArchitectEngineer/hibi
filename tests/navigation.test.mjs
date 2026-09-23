@@ -8,7 +8,7 @@ import { electron, waitForDocumentEditor } from './electron.mjs'
 import { clickMenu, pressShortcut, replaceRichText } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 
-test('shift-click links, note/settings history, and file-menu remote imports', {
+test('modified link clicks, note/settings history, and file-menu remote imports', {
   timeout: 40000,
 }, async (t) => {
   const root = await mkdtemp(join(tmpdir(), 'hibi-navigation-'))
@@ -72,9 +72,6 @@ test('shift-click links, note/settings history, and file-menu remote imports', {
     (await page.evaluate(() => window.hibi.getDocument())).name,
     'a.md',
   )
-  await rich
-    .getByRole('link', { name: /^next$/i, exact: true })
-    .click({ modifiers: ['Shift'] })
   const waitName = async (name) => {
     await waitForAsync(
       page,
@@ -86,6 +83,17 @@ test('shift-click links, note/settings history, and file-menu remote imports', {
         document.querySelector('.app').getAttribute('aria-busy') === 'false',
     )
   }
+  if (process.platform === 'darwin') {
+    await rich
+      .getByRole('link', { name: /^next$/i, exact: true })
+      .click({ modifiers: ['Control', 'Meta'] })
+    await waitName('b.md')
+    await pressShortcut(app, `${mod}+[`)
+    await waitName('a.md')
+  }
+  await rich
+    .getByRole('link', { name: /^next$/i, exact: true })
+    .click({ modifiers: ['Shift'] })
   await waitName('b.md')
   await pressShortcut(app, `${mod}+[`)
   await waitName('a.md')
