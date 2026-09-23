@@ -372,6 +372,19 @@ function App() {
   const [recentWorkspaces, setRecentWorkspaces] = useState<
     RecentWorkspace[] | null
   >(null)
+  useEffect(() => {
+    if (!paletteOpen) return
+    let active = true
+    void window.hibi
+      .getRecentWorkspaces()
+      .then((items) => {
+        if (active) setRecentWorkspaces(items)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [paletteOpen])
   const [welcomeDismissed, setWelcomeDismissed] = useState(
     () => sessionStorage.getItem('hibi:welcome-dismissed') === 'true',
   )
@@ -1395,6 +1408,19 @@ function App() {
           run: () => addonHost.app.runAction(id),
         })),
     )
+    if (!busy)
+      paletteCommands.push({
+        id: 'workspace.recent',
+        category: 'workspace',
+        label: 'Open recent workspaces',
+        children: (recentWorkspaces ?? []).map(({ id, path }) => ({
+          id: `workspace.recent.${id}`,
+          category: 'workspace',
+          label: path.split(/[/\\]/).at(-1) ?? path,
+          detail: path,
+          run: () => void openFolder(id),
+        })),
+      })
     paletteCommands.push(
       ...sidebarViews.map((view) => ({
         id: `sidebar.${view.id}`,
