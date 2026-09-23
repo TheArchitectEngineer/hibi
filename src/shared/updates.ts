@@ -2,6 +2,7 @@ export const UPDATE_CHANNELS = {
   get: 'updates:get',
   channel: 'updates:channel',
   startup: 'updates:startup',
+  frequency: 'updates:frequency',
   check: 'updates:check',
   download: 'updates:download',
   install: 'updates:install',
@@ -9,9 +10,11 @@ export const UPDATE_CHANNELS = {
 } as const
 
 export type UpdateChannel = 'nightly-green' | 'nightly'
+export type UpdateCheckFrequency = 1 | 6 | 12 | 24
 export type UpdateState = {
   channel: UpdateChannel
   checkOnStartup: boolean
+  checkFrequency: UpdateCheckFrequency
   status:
     | 'idle'
     | 'checking'
@@ -38,6 +41,12 @@ export const UPDATE_URL =
 export function updateChannel(input: unknown): UpdateChannel {
   if (input !== 'nightly-green' && input !== 'nightly')
     throw new Error('Choose a valid update channel.')
+  return input
+}
+
+export function updateCheckFrequency(input: unknown): UpdateCheckFrequency {
+  if (input !== 1 && input !== 6 && input !== 12 && input !== 24)
+    throw new Error('Choose a valid update check frequency.')
   return input
 }
 

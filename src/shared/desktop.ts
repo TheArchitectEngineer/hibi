@@ -77,6 +77,9 @@ export type DesktopApi = {
   setUpdateStartupCheck: (
     enabled: boolean,
   ) => Promise<import('./updates').UpdateState>
+  setUpdateCheckFrequency: (
+    hours: import('./updates').UpdateCheckFrequency,
+  ) => Promise<import('./updates').UpdateState>
   checkForUpdates: () => Promise<import('./updates').UpdateState>
   downloadUpdate: () => Promise<import('./updates').UpdateState>
   installUpdate: () => Promise<void>

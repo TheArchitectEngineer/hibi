@@ -10,12 +10,14 @@ import {
   type UpdateRelease,
   type UpdateState,
   updateChannel,
+  updateCheckFrequency,
   updateRelease,
 } from '../shared/updates'
 
 let state: UpdateState = {
   channel: 'nightly-green',
   checkOnStartup: true,
+  checkFrequency: 6,
   status: 'idle',
   supported: false,
   message: 'Updates are available in installed builds.',
@@ -26,12 +28,15 @@ let installRequested = false
 let installing = false
 let installFailure: (() => void) | undefined
 let busy = false
+let periodicCheck: ReturnType<typeof setInterval> | undefined
 const unsupportedMessage =
   'Updates require an installed macOS or Windows build, or a running Linux AppImage.'
 const preferencePath = () =>
   join(app.getPath('userData'), 'update-channel.json')
 const startupPreferencePath = () =>
   join(app.getPath('userData'), 'update-startup-check.json')
+const frequencyPreferencePath = () =>
+  join(app.getPath('userData'), 'update-check-frequency.json')
 export const getUpdateState = () => ({ ...state })
 export function onUpdateInstallFailure(callback?: () => void) {
   installFailure = callback
@@ -87,6 +92,13 @@ export async function loadUpdates() {
   } catch {
     /* Missing preferences check on startup. */
   }
+  try {
+    state.checkFrequency = updateCheckFrequency(
+      JSON.parse(await readFile(frequencyPreferencePath(), 'utf8')),
+    )
+  } catch {
+    /* Missing or old preferences use six hours. */
+  }
   state.supported =
     app.isPackaged &&
     ((process.platform === 'darwin' &&
@@ -100,21 +112,31 @@ export async function loadUpdates() {
     : unsupportedMessage
 }
 
+function schedulePeriodicChecks() {
+  if (periodicCheck) clearInterval(periodicCheck)
+  periodicCheck = setInterval(
+    checkAutomatically,
+    state.checkFrequency * 60 * 60 * 1000,
+  )
+  periodicCheck.unref()
+}
+
+function checkAutomatically() {
+  if (
+    !busy &&
+    !installRequested &&
+    !installing &&
+    ['idle', 'error'].includes(state.status)
+  )
+    void checkForUpdates().catch(() => {})
+}
+
 export function startUpdateChecks() {
   if (!state.supported) return
-  const check = () => {
-    if (
-      !busy &&
-      !installRequested &&
-      !installing &&
-      ['idle', 'error'].includes(state.status)
-    )
-      void checkForUpdates().catch(() => {})
-  }
   setTimeout(() => {
-    if (state.checkOnStartup) check()
+    if (state.checkOnStartup) checkAutomatically()
   }, 15_000).unref()
-  setInterval(check, 6 * 60 * 60 * 1000).unref()
+  schedulePeriodicChecks()
 }
 
 export function setUpdateStartupCheck(input: unknown) {
@@ -126,6 +148,18 @@ export function setUpdateStartupCheck(input: unknown) {
     })
     await rename(`${startupPreferencePath()}.tmp`, startupPreferencePath())
     publish({ checkOnStartup: input })
+  })
+}
+
+export function setUpdateCheckFrequency(input: unknown) {
+  const hours = updateCheckFrequency(input)
+  return run(async () => {
+    await writeFile(`${frequencyPreferencePath()}.tmp`, JSON.stringify(hours), {
+      mode: 0o600,
+    })
+    await rename(`${frequencyPreferencePath()}.tmp`, frequencyPreferencePath())
+    publish({ checkFrequency: hours })
+    if (periodicCheck) schedulePeriodicChecks()
   })
 }
 
