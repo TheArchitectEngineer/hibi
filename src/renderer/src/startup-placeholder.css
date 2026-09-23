@@ -35,6 +35,11 @@
 .startup-placeholder p {
   font-size: var(--text-sm);
 }
+.startup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
 .startup-placeholder .ui-button {
   pointer-events: auto;
   min-height: 0;

@@ -139,6 +139,26 @@ test('startup placeholder stays out of documents and reopens persisted recent wo
   await app.close()
   app = null
 
+  const outside = join(temp, 'outside.md')
+  await writeFile(outside, 'outside note')
+  page = await launch()
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [path],
+    })
+  }, outside)
+  await welcome()
+    .getByRole('button', { name: /open a file/i })
+    .click()
+  await welcome().waitFor({ state: 'hidden' })
+  assert.equal(
+    (await page.evaluate(() => window.hibi.getDocument())).markdown,
+    'outside note',
+  )
+  await app.close()
+  app = null
+
   page = await launch()
   await welcome()
     .getByRole('button', { name: /dismiss this screen/i })
