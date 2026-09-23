@@ -20,7 +20,7 @@ import {
 } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, placeholder } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DocumentFormat, SourceExtension } from '../../addons/api'
 import { type DocumentState, MAX_DOCUMENT_BYTES } from '../../shared/desktop'
 import { editedSource, sourceEditMatches } from '../../shared/document-edits'
@@ -181,8 +181,13 @@ export function SourceEditor({
   const inputReady = installedExtensions === sourceExtensions && languageReady
   const editContext = useRef({ document, editTarget, disabled, inputReady })
   editContext.current = { document, editTarget, disabled, inputReady }
-  const [session] = useState(() => documentRuntime.session()!)
-  const [bridge] = useState(() => createSourceSession(session))
+  const [bridgeRetry, retryBridge] = useState(0)
+  const session = documentRuntime.session()!
+  // biome-ignore lint/correctness/useExhaustiveDependencies: retry refreshes a bridge whose snapshot went stale before attachment.
+  const bridge = useMemo(
+    () => createSourceSession(session),
+    [session, bridgeRetry],
+  )
   const exactChanges = useRef<readonly RawEdit[] | undefined>(undefined)
   const editable = useRef(new Compartment())
   const numbers = useRef(new Compartment())
@@ -419,11 +424,17 @@ export function SourceEditor({
     const active = documentRuntime.get()
     if (
       !active ||
-      documentRuntime.session() !== session ||
       active.tabId !== document.tabId ||
       active.revision !== document.revision
     )
       return
+    if (
+      documentRuntime.session() !== session ||
+      !session.ownsCurrentSnapshot(bridge.snapshot())
+    ) {
+      retryBridge((retry) => retry + 1)
+      return
+    }
     const language = new Compartment()
     const markdown = () => {
       const {

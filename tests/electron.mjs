@@ -69,6 +69,26 @@ export const electron = {
           }
         }, 4000)
         slowStartTimer.unref()
+        void page
+          .waitForFunction(
+            () => {
+              const editor = document.querySelector('.editor-page')
+              return (
+                editor &&
+                !editor.inert &&
+                editor.getAttribute('aria-busy') !== 'true' &&
+                editor.querySelector(
+                  '.tiptap[contenteditable="true"], .cm-content[contenteditable="true"]',
+                )
+              )
+            },
+            undefined,
+            { timeout: 4000 },
+          )
+          .then(
+            () => clearTimeout(slowStartTimer),
+            () => {},
+          )
       }
     }
     return application
