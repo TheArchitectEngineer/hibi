@@ -95,6 +95,7 @@ type Environment = Omit<
   getMarkdown: () => string
   openSidebar: (id: string, input?: unknown, side?: 'left' | 'right') => void
   closeSidebar: (side: 'left' | 'right') => void
+  openTab: () => void
   focusDocument: (tabId: string) => Promise<boolean>
 }
 
@@ -192,7 +193,10 @@ export function useAddons(
     addonViews.snapshot,
   )
   const sidebarViews = useMemo(
-    () => viewState.definitions.filter((view) => view.location !== 'panel'),
+    () =>
+      viewState.definitions.filter(
+        (view) => !view.location || view.location === 'sidebar',
+      ),
     [viewState.definitions],
   )
   const registered = useRef(new Map<string, RegisteredCommand>()).current
@@ -391,6 +395,7 @@ export function useAddons(
             openSidebar: (key, side) =>
               latest.current.openSidebar(key, undefined, side),
             closeSidebar: (side) => latest.current.closeSidebar(side),
+            openTab: () => latest.current.openTab(),
             focusDocument: (tabId) => latest.current.focusDocument(tabId),
           })
           for (const entry of pending.values())
@@ -403,7 +408,7 @@ export function useAddons(
               throw new Error('This view is no longer available.')
             if (registered) return registered.open(options)
             const side =
-              view.location === 'panel'
+              view.location === 'panel' || view.location === 'tab'
                 ? 'left'
                 : (options.side ?? view.side ?? 'left')
             const instanceId = `${id}.${view.id}:${side === 'right' ? 'right:' : ''}${options.id ?? 'default'}`

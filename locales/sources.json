@@ -2688,9 +2688,6 @@
   "3dd042fdb3dd": [
     "src/addons/discord-presence/Settings.tsx"
   ],
-  "eadd61bac0d2": [
-    "src/renderer/src/DocumentTabs.tsx"
-  ],
   "29d05e904395": [
     "src/shared/hotkeys.ts"
   ],
@@ -2721,6 +2718,9 @@
   ],
   "2b249c749333": [
     "src/renderer/src/SourceEditor.tsx"
+  ],
+  "33c2eb40cc43": [
+    "src/renderer/src/DocumentTabs.tsx"
   ],
   "7bcc1921ca42": [
     "src/addons/discord-presence/rpc.ts"

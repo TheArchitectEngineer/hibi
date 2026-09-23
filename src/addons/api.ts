@@ -418,7 +418,7 @@ export type AddonView = {
   id: string
   label: string
   icon?: SidebarView['icon']
-  location?: 'sidebar' | 'panel'
+  location?: 'sidebar' | 'panel' | 'tab'
   /** Preferred side for sidebar views. Users can choose either side in its picker. */
   side?: 'left' | 'right'
   /** Visible views unmount when hidden; session views retain local state until closed or disposed. */
@@ -439,7 +439,7 @@ export type ViewRegistration = {
     input?: unknown
     binding?: 'follow' | 'pinned'
     focus?: boolean
-    /** Override the sidebar's preferred side. Instances are independent on each side. */
+    /** Override the sidebar's preferred side. Ignored for panels and tabs. */
     side?: 'left' | 'right'
   }) => ViewInstance
   dispose: () => void

@@ -8,6 +8,7 @@ import {
 } from 'react'
 import type { DocumentState } from '../../shared/desktop'
 import { IconButton } from '../../ui/Controls'
+import type { ViewEntry } from './addon-views'
 
 export function DocumentTabs({
   document,
@@ -15,12 +16,20 @@ export function DocumentTabs({
   onSelect,
   onClose,
   onMove,
+  addonTabs,
+  activeAddonTab,
+  onSelectAddon,
+  onCloseAddon,
 }: {
   document: DocumentState
   busy: boolean
   onSelect: (id: string) => void
   onClose: (id: string) => void
   onMove: (id: string, beforeId: string | null) => void
+  addonTabs: ViewEntry[]
+  activeAddonTab: string | null
+  onSelectAddon: (id: string) => void
+  onCloseAddon: (id: string) => void
 }) {
   const strip = useRef<HTMLDivElement>(null)
   const active = useRef<HTMLDivElement>(null)
@@ -28,12 +37,17 @@ export function DocumentTabs({
   const wasClosing = useRef(false)
   const dragged = useRef<string | null>(null)
   const keyboardFocus = useRef<string | null>(null)
+  const navigationFocus = useRef<string | null>(null)
   const [drop, setDrop] = useState<{
     id: string
     side: 'before' | 'after'
   } | null>(null)
   const [rendered, setRendered] = useState(document.tabs)
   const tabIds = document.tabs.map((tab) => tab.id).join(',')
+  const ordered = [
+    ...document.tabs.map((tab) => ({ id: tab.id, addon: false })),
+    ...addonTabs.map((tab) => ({ id: tab.id, addon: true })),
+  ]
   useLayoutEffect(() => {
     setRendered((previous) => {
       const next = [...document.tabs]
@@ -113,20 +127,48 @@ export function DocumentTabs({
       )
         strip.current
           ?.querySelector<HTMLButtonElement>(
-            `[data-tab-id="${keyboardFocus.current}"]`,
+            `[data-tab-id="${CSS.escape(keyboardFocus.current)}"]`,
           )
           ?.focus({ preventScroll: true })
       keyboardFocus.current = null
     }
+    if (
+      navigationFocus.current &&
+      (navigationFocus.current === activeAddonTab ||
+        (!activeAddonTab && navigationFocus.current === document.tabId))
+    ) {
+      const id = navigationFocus.current
+      navigationFocus.current = null
+      requestAnimationFrame(() => {
+        const focused = window.document.activeElement
+        if (
+          focused === window.document.body ||
+          strip.current?.contains(focused) ||
+          focused?.closest('.editor-panes, .addon-tab-panel')
+        )
+          strip.current
+            ?.querySelector<HTMLButtonElement>(
+              `[data-tab-id="${CSS.escape(id)}"]`,
+            )
+            ?.focus({ preventScroll: true })
+      })
+    }
     revealActive()
-  }, [rendered, document.tabId, document.name, document.dirty])
+  }, [
+    rendered,
+    document.tabId,
+    document.name,
+    document.dirty,
+    addonTabs,
+    activeAddonTab,
+  ])
   return (
     <div
       className="document-tabs"
       ref={strip}
       role="tablist"
-      aria-label="Open documents"
-      aria-description="Drag to reorder tabs, or use Alt+Shift+Left or Right on a focused tab."
+      aria-label="Open tabs"
+      aria-description="Drag document tabs to reorder, or use Alt+Shift+Left or Right on a focused document tab."
       onKeyDown={(event) => {
         if (
           busy ||
@@ -135,7 +177,7 @@ export function DocumentTabs({
         )
           return
         const focusedId = event.target.getAttribute('data-tab-id')
-        const index = document.tabs.findIndex((tab) => tab.id === focusedId)
+        const index = ordered.findIndex((tab) => tab.id === focusedId)
         if (
           event.altKey &&
           event.shiftKey &&
@@ -143,8 +185,8 @@ export function DocumentTabs({
         ) {
           event.preventDefault()
           event.stopPropagation()
-          const tab = document.tabs[index]
-          if (!tab) return
+          const tab = ordered[index]
+          if (!tab || tab.addon) return
           if (event.key === 'ArrowLeft' && index > 0) {
             keyboardFocus.current = tab.id
             onMove(tab.id, document.tabs[index - 1]!.id)
@@ -157,7 +199,7 @@ export function DocumentTabs({
           }
           return
         }
-        const last = document.tabs.length - 1
+        const last = ordered.length - 1
         const next =
           event.key === 'ArrowRight'
             ? (index + 1) % (last + 1)
@@ -170,11 +212,15 @@ export function DocumentTabs({
                   : null
         if (next !== null) {
           event.preventDefault()
-          const tab = document.tabs[next]
+          const tab = ordered[next]
           if (tab) {
-            onSelect(tab.id)
+            navigationFocus.current = tab.id
+            if (tab.addon) onSelectAddon(tab.id)
+            else onSelect(tab.id)
             event.currentTarget
-              .querySelector<HTMLButtonElement>(`[data-tab-id="${tab.id}"]`)
+              .querySelector<HTMLButtonElement>(
+                `[data-tab-id="${CSS.escape(tab.id)}"]`,
+              )
               ?.focus({ preventScroll: true })
           }
         }
@@ -182,7 +228,7 @@ export function DocumentTabs({
     >
       {rendered.map((tab) => {
         const closing = !document.tabs.some((current) => current.id === tab.id)
-        const selected = tab.id === document.tabId
+        const selected = !activeAddonTab && tab.id === document.tabId
         const name = selected ? document.name : tab.name
         const dirty = selected ? document.dirty : tab.dirty
         return (
@@ -290,6 +336,46 @@ export function DocumentTabs({
               title="Close tab"
               disabled={busy}
               onClick={() => onClose(tab.id)}
+            >
+              <X size={12} />
+            </IconButton>
+          </div>
+        )
+      })}
+      {addonTabs.map((tab) => {
+        const selected = tab.id === activeAddonTab
+        const name = tab.definition.label
+        return (
+          <div
+            className="document-tab"
+            key={tab.id}
+            data-active={selected}
+            data-tab-key={tab.id}
+            ref={selected ? active : undefined}
+          >
+            <button
+              type="button"
+              role="tab"
+              id={`addon-tab-${tab.id}`}
+              aria-controls="addon-tab-panel"
+              className="document-name"
+              data-tab-id={tab.id}
+              aria-label={name}
+              aria-selected={selected}
+              aria-disabled={busy}
+              tabIndex={selected ? 0 : -1}
+              data-tooltip={name}
+              onClick={() => {
+                if (!busy && !selected) onSelectAddon(tab.id)
+              }}
+            >
+              <span>{name}</span>
+            </button>
+            <IconButton
+              className="tab-close"
+              aria-label={`Close ${name}`}
+              title="Close tab"
+              onClick={() => onCloseAddon(tab.id)}
             >
               <X size={12} />
             </IconButton>

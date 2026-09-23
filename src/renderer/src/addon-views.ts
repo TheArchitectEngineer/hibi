@@ -10,6 +10,7 @@ import { editorDocument } from './document-formats'
 type Environment = {
   openSidebar: (id: string, side: 'left' | 'right') => void
   closeSidebar: (side: 'left' | 'right') => void
+  openTab: () => void
   focusDocument: (tabId: string) => Promise<boolean>
 }
 export type RegisteredView = AddonView & {
@@ -29,6 +30,7 @@ const definitions = new Map<string, RegisteredView>()
 const instances = new Map<string, ViewEntry>()
 const listeners = new Set<() => void>()
 let activePanel: string | null = null
+let activeTab: string | null = null
 let activeSidebar: string | null = null
 let activeRightSidebar: string | null = null
 let focusTarget: string | null = null
@@ -36,6 +38,7 @@ let snapshot: {
   definitions: RegisteredView[]
   instances: ViewEntry[]
   activePanel: string | null
+  activeTab: string | null
   activeSidebar: string | null
   activeRightSidebar: string | null
   focusTarget: string | null
@@ -43,6 +46,7 @@ let snapshot: {
   definitions: [],
   instances: [],
   activePanel,
+  activeTab,
   activeSidebar,
   activeRightSidebar,
   focusTarget,
@@ -52,6 +56,7 @@ const publish = () => {
     definitions: [...definitions.values()],
     instances: [...instances.values()],
     activePanel,
+    activeTab,
     activeSidebar,
     activeRightSidebar,
     focusTarget,
@@ -75,7 +80,9 @@ function open(
   if (definitions.get(definition.id) !== definition)
     throw new Error('This view is no longer available.')
   const panel = definition.location === 'panel'
-  const side = panel ? 'left' : (options.side ?? definition.side ?? 'left')
+  const tab = definition.location === 'tab'
+  const side =
+    panel || tab ? 'left' : (options.side ?? definition.side ?? 'left')
   if (!['left', 'right'].includes(side))
     throw new Error('Invalid sidebar side.')
   const localId = options.id ?? 'default'
@@ -83,6 +90,7 @@ function open(
     throw new Error('Invalid view instance ID.')
   const id = `${definition.id}:${side === 'right' ? 'right:' : ''}${localId}`
   const select = () => {
+    if (tab) return
     if (side === 'right') activeRightSidebar = id
     else activeSidebar = id
   }
@@ -114,16 +122,22 @@ function open(
     show() {
       if (!instances.has(id)) return
       if (panel) activePanel = id
+      else if (tab) activeTab = id
       else select()
       publish()
-      if (!panel) definition.environment.openSidebar(definition.id, side)
+      if (tab) definition.environment.openTab()
+      else if (!panel) definition.environment.openSidebar(definition.id, side)
     },
     hide() {
       if (!instances.has(id)) return
       const element = window.document.querySelector(
         `[data-addon-view="${CSS.escape(id)}"]`,
       )
-      if (element?.contains(window.document.activeElement)) {
+      const focusedInView = element?.contains(window.document.activeElement)
+      const focusedInTab = window.document
+        .getElementById(`addon-tab-${id}`)
+        ?.parentElement?.contains(window.document.activeElement)
+      if (focusedInView && !tab) {
         const target =
           returnFocus?.isConnected && !returnFocus.closest('[hidden], [inert]')
             ? returnFocus
@@ -133,8 +147,10 @@ function open(
         target?.focus({ preventScroll: true })
       }
       if (panel && activePanel === id) activePanel = null
+      else if (tab && activeTab === id) activeTab = null
       else if (
         !panel &&
+        !tab &&
         (side === 'right' ? activeRightSidebar : activeSidebar) === id
       ) {
         if (side === 'right') activeRightSidebar = null
@@ -143,6 +159,14 @@ function open(
       }
       if (focusTarget === id) focusTarget = null
       publish()
+      if (tab && (focusedInView || focusedInTab))
+        requestAnimationFrame(() =>
+          window.document
+            .querySelector<HTMLElement>(
+              '.editor-panes .rich-pane:not([inert]) [contenteditable="true"], .editor-panes .source-pane:not([inert]) [contenteditable="true"]',
+            )
+            ?.focus({ preventScroll: true }),
+        )
     },
     close() {
       if (!instances.has(id)) return
@@ -190,7 +214,7 @@ export const addonViews = {
     if (
       !/^[a-z][a-z0-9-]*$/.test(view.id) ||
       definitions.has(id) ||
-      (view.location && !['sidebar', 'panel'].includes(view.location)) ||
+      (view.location && !['sidebar', 'panel', 'tab'].includes(view.location)) ||
       (view.side && !['left', 'right'].includes(view.side)) ||
       (view.lifetime && !['visible', 'session'].includes(view.lifetime))
     )
@@ -205,7 +229,11 @@ export const addonViews = {
         for (const entry of [...instances.values()]) {
           if (entry.definition !== definition) continue
           // Removing an addon leaves the shared sidebar open for its workspace fallback.
-          if (entry.definition.location === 'panel') entry.handle.close()
+          if (
+            entry.definition.location === 'panel' ||
+            entry.definition.location === 'tab'
+          )
+            entry.handle.close()
           else {
             if (activeSidebar === entry.id) activeSidebar = null
             if (activeRightSidebar === entry.id) activeRightSidebar = null
@@ -221,7 +249,10 @@ export const addonViews = {
   selectSidebar(id: string, input?: unknown, side: 'left' | 'right' = 'left') {
     const selected = side === 'right' ? activeRightSidebar : activeSidebar
     const definition = definitions.get(id)
-    if (!definition || definition.location === 'panel') {
+    if (
+      !definition ||
+      (definition.location && definition.location !== 'sidebar')
+    ) {
       if (selected) {
         if (side === 'right') activeRightSidebar = null
         else activeSidebar = null
@@ -238,5 +269,10 @@ export const addonViews = {
       focusTarget = null
       publish()
     }
+  },
+  selectDocument() {
+    if (activeTab === null) return
+    activeTab = null
+    publish()
   },
 }

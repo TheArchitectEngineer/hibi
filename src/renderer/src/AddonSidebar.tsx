@@ -60,7 +60,9 @@ export function AddonSidebar({
           {state.instances
             .filter(
               (entry) =>
-                entry.definition.location !== 'panel' && entry.side === side,
+                (!entry.definition.location ||
+                  entry.definition.location === 'sidebar') &&
+                entry.side === side,
             )
             .map((entry) => (
               <AddonViewContent

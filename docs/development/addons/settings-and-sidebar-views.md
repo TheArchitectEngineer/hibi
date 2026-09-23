@@ -106,7 +106,7 @@ The shared `Sidebar` also accepts `side: 'right'` to mirror its collapse motion 
 
 ## Bind a view to a document
 
-`context.views.register()` supports sidebars and a panel below the editor. Its `Content` receives `document`, `input`, `instanceId`, `binding`, `visible`, `close()`, and `focusDocument()`. Follow views receive the active document. Open with `binding: 'pinned'` to retain the current document snapshot, including its version, when the user switches tabs or continues editing. A pinned snapshot does not grant permission to edit an inactive document; normal edit validation still applies.
+`context.views.register()` supports sidebars, a panel below the editor, and dedicated tabs. Its `Content` receives `document`, `input`, `instanceId`, `binding`, `visible`, `close()`, and `focusDocument()`. Follow views receive the active document. Open with `binding: 'pinned'` to retain the current document snapshot, including its version, when the user switches tabs or continues editing. A pinned snapshot does not grant permission to edit an inactive document; normal edit validation still applies.
 
 ```tsx
 const report = context.views.register({
@@ -119,7 +119,24 @@ const report = context.views.register({
 const instance = report.open({ id: 'comparison', binding: 'pinned' })
 ```
 
-Opening the same instance ID on the same side reuses it. For sidebar views, `side: 'left' | 'right'` is accepted both at registration and in `open()` options; the open option overrides the registration default. Each side keeps independent instances, so the same view can appear in both sidebars without sharing component state. Panel views ignore `side`. Treat `instanceId` as an opaque identifier.
+Use `location: 'tab'` for a full-size view beside document tabs. Opening an instance selects its tab; opening the same ID again reuses it. Closing the tab releases that instance. Selecting a document tab hides the addon view without closing it. Tab views remain available when document tabs are turned off, and they are removed when the addon stops.
+
+```tsx
+const dashboard = context.views.register({
+  id: 'dashboard',
+  label: 'Dashboard',
+  location: 'tab',
+  lifetime: 'session',
+  Content: Dashboard,
+})
+context.commands.register({
+  id: 'open-dashboard',
+  label: 'Open dashboard',
+  run: () => dashboard.open(),
+})
+```
+
+Opening the same instance ID on the same side reuses it. For sidebar views, `side: 'left' | 'right'` is accepted both at registration and in `open()` options; the open option overrides the registration default. Each side keeps independent instances, so the same view can appear in both sidebars without sharing component state. Panel and tab views ignore `side`. Treat `instanceId` as an opaque identifier.
 
 `hide()` keeps the instance; `show()` reveals it; `close()` releases it. The default `lifetime: 'visible'` unmounts content when hidden. Session views retain React state until closed or until their addon stops. Pause timers and analysis when `visible` is false. The host allows eight instances per addon and 32 across the window, counting instances on both sides.
 
