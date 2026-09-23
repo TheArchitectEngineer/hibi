@@ -77,11 +77,13 @@ export function UpdateSettings() {
             id="update-startup-check"
             checked={state?.checkOnStartup ?? true}
             disabled={waiting}
-            onChange={(event) =>
-              void run(() =>
-                window.hibi.setUpdateStartupCheck(event.target.checked),
+            onChange={(event) => {
+              const enabled = event.target.checked
+              setState((current) =>
+                current ? { ...current, checkOnStartup: enabled } : current,
               )
-            }
+              void run(() => window.hibi.setUpdateStartupCheck(enabled))
+            }}
           />
         </SettingRow>
         <SettingRow

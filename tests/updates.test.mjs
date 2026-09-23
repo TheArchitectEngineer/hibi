@@ -480,9 +480,12 @@ test('update settings expose both channels, persist choice, and fit narrow windo
       page.evaluate(() => window.hibi.setUpdateStartupCheck('false')),
       /startup/,
     )
-    await startup.click()
+    await startup.uncheck()
     await page.waitForFunction(
       async () => !(await window.hibi.getUpdateState()).checkOnStartup,
+    )
+    await page.waitForFunction(
+      () => !document.querySelector('#update-startup-check').checked,
     )
     assert.equal(await startup.isChecked(), false)
     await picker.selectOption('nightly')
