@@ -62,6 +62,7 @@ test('desktop launch, isolation, offline reload, and recovery', {
       api: [
         'getUpdateState',
         'setUpdateChannel',
+        'setUpdateStartupCheck',
         'checkForUpdates',
         'downloadUpdate',
         'installUpdate',
