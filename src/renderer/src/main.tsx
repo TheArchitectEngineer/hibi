@@ -108,6 +108,7 @@ const VersionHistory = lazy(() =>
   })),
 )
 function App() {
+  startupMark('app-render')
   const addonViewState = useSyncExternalStore(
     addonViews.subscribe,
     addonViews.snapshot,
@@ -798,9 +799,11 @@ function App() {
       .then((items) => {
         if (active) setRecentWorkspaces(items)
       })
+    startupMark('bootstrap-document-effect')
     window.hibi.bootstrap
       .document()
       .then(({ info, document, hotkeys, workspace, externalPending }) => {
+        startupMark('bootstrap-document-result')
         if (active) {
           initialExternalPending.current = externalPending
           setWorkspace(workspace)
