@@ -98,7 +98,11 @@ export async function vaultCreate(input: unknown, context: NativeAddonContext) {
   }
   await writeMarkdown(join(parent, name), data.content, true)
   await refreshWorkspace()
-  return path
+  const stat = await lstat(join(parent, name))
+  return {
+    path,
+    stat: { ctime: stat.ctimeMs, mtime: stat.mtimeMs, size: stat.size },
+  }
 }
 
 export async function vaultModify(input: unknown, context: NativeAddonContext) {
@@ -115,7 +119,8 @@ export async function vaultModify(input: unknown, context: NativeAddonContext) {
     throw new Error('This note changed since the plugin read it. Try again.')
   await writeMarkdown(path, data.content)
   await context.workspace.reload()
-  return data.path
+  const stat = await lstat(path)
+  return { ctime: stat.ctimeMs, mtime: stat.mtimeMs, size: stat.size }
 }
 
 function currentWindow() {

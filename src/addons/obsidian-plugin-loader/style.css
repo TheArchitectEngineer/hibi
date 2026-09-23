@@ -12,6 +12,11 @@
   margin: 0.3rem 0;
 }
 
+.obsidian-plugin-status {
+  margin-left: 0.5rem;
+  color: var(--muted);
+}
+
 .obsidian-plugin-setting {
   display: grid;
   gap: 0.35rem;

@@ -117,6 +117,13 @@ export function ObsidianPluginPanel({
               <div>
                 <strong>{plugin.manifest.name}</strong>
                 <span> {plugin.manifest.version}</span>
+                <span className="obsidian-plugin-status">
+                  {plugin.enabled
+                    ? runtime.isRunning(plugin.manifest.id)
+                      ? 'Running'
+                      : 'Not running'
+                    : 'Disabled'}
+                </span>
                 <p>{plugin.manifest.description}</p>
                 {runtime.error(plugin.manifest.id) && (
                   <p role="alert">
@@ -134,7 +141,7 @@ export function ObsidianPluginPanel({
                     void toggle(plugin, event.target.checked)
                   }
                 />
-                {plugin.enabled && (
+                {plugin.enabled && runtime.hasSettings(plugin.manifest.id) && (
                   <Button
                     variant="ghost"
                     disabled={busy}

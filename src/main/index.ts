@@ -17,7 +17,6 @@ import {
   systemPreferences,
 } from 'electron'
 import { ADDON_CHANNELS } from '../addons/api'
-import { obsidianPluginRoot } from '../addons/obsidian-plugin-loader/native'
 import { obsidianPluginAsset } from '../addons/obsidian-plugin-loader/store'
 import { ABOUT_CHANNELS, SPONSOR_URL } from '../shared/about'
 import { ANALYSIS_CHANNELS } from '../shared/analysis'
@@ -288,7 +287,10 @@ async function serveAsset(request: Request): Promise<Response> {
         )
       )
         return new Response(null, { status: 403 })
-      const asset = await obsidianPluginAsset(obsidianPluginRoot(), request.url)
+      const asset = await obsidianPluginAsset(
+        join(app.getPath('userData'), 'obsidian-plugins'),
+        request.url,
+      )
       if (asset === null) return new Response(null, { status: 404 })
       return new Response(asset, {
         headers: {

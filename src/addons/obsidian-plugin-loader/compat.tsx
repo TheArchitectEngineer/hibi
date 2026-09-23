@@ -4,6 +4,7 @@ import type { Editor as RichEditor } from '@tiptap/core'
 import { Puzzle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import type { AddonContext } from '../api'
+import { obsidianMetadata } from './metadata'
 import type { ObsidianPluginManifest, ObsidianVaultFile } from './package'
 
 type ObsidianElement = HTMLElement & {
@@ -121,6 +122,8 @@ export function createObsidianApi(
   vaultName: string,
   workspaceId: string | null,
   initialFiles: ObsidianVaultFile[],
+  initialSources: ReadonlyMap<string, string>,
+  initialActivePath: string | null,
   onSettings: (
     tab: {
       containerEl: HTMLElement
@@ -131,9 +134,23 @@ export function createObsidianApi(
 ) {
   const editor = editorApi(context, bridge)
   const pluginId = manifest.id.replace(/[^a-z0-9-]/g, '-')
+  const unsupported = (feature: string): never => {
+    throw new Error(
+      `${feature} is not available in Hibi's Obsidian plugin bridge.`,
+    )
+  }
+  let name = vaultName
+  let activePath = initialActivePath
   let nextItem = 0
   const lastRead = new Map<string, string>()
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>()
+  const metadataListeners = new Map<string, Set<(...args: unknown[]) => void>>()
+  const sources = new Map(initialSources)
+  const parsed = new Map<
+    string,
+    { source: string; value: ReturnType<typeof obsidianMetadata> }
+  >()
+  const openDialogs = new Set<() => void>()
 
   class TFile {
     path: string
@@ -157,8 +174,103 @@ export function createObsidianApi(
     initialFiles.map((file) => [file.path, new TFile(file)]),
   )
 
+  function resolveLink(linktext: string, sourcePath: string) {
+    if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(linktext)) return null
+    let target: string
+    try {
+      target = decodeURIComponent(linktext.split('#')[0] ?? '')
+    } catch {
+      return null
+    }
+    if (!target) return files.get(sourcePath) ?? null
+    if (!target.startsWith('.')) {
+      const root =
+        files.get(target.replace(/^\//, '')) ??
+        files.get(`${target.replace(/^\//, '')}.md`)
+      if (root) return root
+    }
+    const parts = target.startsWith('/')
+      ? []
+      : sourcePath.split('/').slice(0, -1)
+    for (const part of target.split('/')) {
+      if (!part || part === '.') continue
+      if (part === '..') {
+        if (!parts.length) return null
+        parts.pop()
+      } else parts.push(part)
+    }
+    const path = parts.join('/')
+    const exact = files.get(path) ?? files.get(`${path}.md`)
+    if (exact) return exact
+    const matches = [...files.values()].filter(
+      (file) => file.basename === target || file.name === target,
+    )
+    return matches.length === 1 ? matches[0] : null
+  }
+
+  function getCache(path: string) {
+    const source = sources.get(path)
+    if (source === undefined) return null
+    const cached = parsed.get(path)
+    if (cached?.source === source) return cached.value
+    const value = obsidianMetadata(source)
+    parsed.set(path, { source, value })
+    return value
+  }
+
+  const metadataCache = {
+    getFileCache: (file: TFile) => getCache(file.path),
+    getCache,
+    getFirstLinkpathDest: resolveLink,
+    fileToLinktext(file: TFile, sourcePath: string, omitMdExtension = false) {
+      const from = sourcePath.split('/').slice(0, -1)
+      const target = file.path.split('/')
+      while (from.length && from[0] === target[0]) {
+        from.shift()
+        target.shift()
+      }
+      const path = `${'../'.repeat(from.length)}${target.join('/')}`
+      return omitMdExtension ? path.replace(/\.md$/i, '') : path
+    },
+    get resolvedLinks() {
+      const result: Record<string, Record<string, number>> = Object.create(null)
+      for (const path of sources.keys()) {
+        const cache = getCache(path)
+        for (const link of [
+          ...(cache?.links ?? []),
+          ...(cache?.embeds ?? []),
+        ]) {
+          const target = resolveLink(link.link, path)
+          if (!target) continue
+          const row = result[path] ?? Object.create(null)
+          result[path] = row
+          row[target.path] = (row[target.path] ?? 0) + 1
+        }
+      }
+      return result
+    },
+    on(name: string, callback: (...args: unknown[]) => void) {
+      const subscribers = metadataListeners.get(name) ?? new Set()
+      subscribers.add(callback)
+      metadataListeners.set(name, subscribers)
+      return { off: () => subscribers.delete(callback) }
+    },
+  }
+
+  function updateSource(path: string, source: string) {
+    sources.set(path, source)
+    parsed.delete(path)
+    const file = files.get(path)
+    if (file)
+      for (const listener of metadataListeners.get('changed') ?? [])
+        listener(file, source, getCache(path))
+  }
+
   const vault = {
-    getName: () => vaultName,
+    get adapter(): never {
+      return unsupported('Vault.adapter')
+    },
+    getName: () => name,
     getMarkdownFiles: () => [...files.values()],
     getFiles: () => [...files.values()],
     getAllLoadedFiles: () => [...files.values()],
@@ -170,39 +282,42 @@ export function createObsidianApi(
         path: file.path,
       })
       lastRead.set(file.path, source)
+      if (sources.get(file.path) !== source) updateSource(file.path, source)
       return source
     },
     async cachedRead(file: TFile) {
       return this.read(file)
     },
     async create(path: string, content: string) {
-      const created = await context.native.invoke<string>('vaultCreate', {
-        workspaceId,
-        path,
-        content,
-      })
-      const file = new TFile({
-        path: created,
-        stat: { ctime: Date.now(), mtime: Date.now(), size: content.length },
-      })
-      files.set(created, file)
-      lastRead.set(created, content)
+      const created = await context.native.invoke<ObsidianVaultFile>(
+        'vaultCreate',
+        {
+          workspaceId,
+          path,
+          content,
+        },
+      )
+      const file = new TFile(created)
+      files.set(created.path, file)
+      lastRead.set(created.path, content)
+      updateSource(created.path, content)
       for (const listener of listeners.get('create') ?? []) listener(file)
       return file
     },
     async modify(file: TFile, content: string) {
-      await context.native.invoke('vaultModify', {
-        workspaceId,
-        path: file.path,
-        content,
-        expected: lastRead.get(file.path),
-      })
+      const stat = await context.native.invoke<ObsidianVaultFile['stat']>(
+        'vaultModify',
+        {
+          workspaceId,
+          path: file.path,
+          content,
+          expected: lastRead.get(file.path),
+        },
+      )
       lastRead.set(file.path, content)
+      updateSource(file.path, content)
       const stored = files.get(file.path)
-      if (stored) {
-        stored.stat.mtime = Date.now()
-        stored.stat.size = content.length
-      }
+      if (stored) stored.stat = stat
       for (const listener of listeners.get('modify') ?? []) listener(file)
     },
     async process(file: TFile, transform: (content: string) => string) {
@@ -223,10 +338,14 @@ export function createObsidianApi(
         destination,
       })
       const stored = files.get(oldPath)
+      const source = sources.get(oldPath)
       files.delete(oldPath)
+      sources.delete(oldPath)
+      parsed.delete(oldPath)
       lastRead.delete(oldPath)
       file.path = path
       if (stored) files.set(path, stored)
+      if (source !== undefined) updateSource(path, source)
       for (const listener of listeners.get('rename') ?? [])
         listener(file, oldPath)
     },
@@ -236,6 +355,8 @@ export function createObsidianApi(
         path: file.path,
       })
       files.delete(file.path)
+      sources.delete(file.path)
+      parsed.delete(file.path)
       lastRead.delete(file.path)
       for (const listener of listeners.get('delete') ?? []) listener(file)
     },
@@ -249,6 +370,76 @@ export function createObsidianApi(
       return { off: () => subscribers.delete(callback) }
     },
   }
+
+  function refreshVault(
+    nextName: string,
+    nextFiles: ObsidianVaultFile[],
+    nextSources: ReadonlyMap<string, string>,
+    nextActivePath: string | null,
+  ) {
+    name = nextName
+    activePath = nextActivePath
+    const paths = new Set(nextFiles.map((file) => file.path))
+    for (const [path, file] of files) {
+      if (paths.has(path)) continue
+      files.delete(path)
+      sources.delete(path)
+      parsed.delete(path)
+      lastRead.delete(path)
+      for (const listener of listeners.get('delete') ?? []) listener(file)
+    }
+    for (const item of nextFiles) {
+      const file = files.get(item.path)
+      const source = nextSources.get(item.path)
+      if (!file) {
+        const created = new TFile(item)
+        files.set(item.path, created)
+        if (source !== undefined) updateSource(item.path, source)
+        for (const listener of listeners.get('create') ?? []) listener(created)
+      } else if (
+        file.stat.mtime !== item.stat.mtime ||
+        file.stat.size !== item.stat.size ||
+        (source !== undefined && sources.get(item.path) !== source)
+      ) {
+        file.stat = item.stat
+        lastRead.delete(item.path)
+        if (source !== undefined) updateSource(item.path, source)
+        for (const listener of listeners.get('modify') ?? []) listener(file)
+      }
+    }
+  }
+
+  let documentId = context.editor.getDocument()?.id
+  let metadataTimer: number | undefined
+  let disposed = false
+  const queueMetadata = (document: {
+    id: string
+    contentVersion: number
+    markdown: string
+  }) => {
+    clearTimeout(metadataTimer)
+    metadataTimer = window.setTimeout(() => {
+      const current = context.editor.getDocument()
+      if (
+        !disposed &&
+        activePath &&
+        current?.id === document.id &&
+        current.contentVersion === document.contentVersion &&
+        sources.get(activePath) !== document.markdown
+      )
+        updateSource(activePath, document.markdown)
+    }, 150)
+  }
+  const offDocument = context.editor.onDocumentChange((document) => {
+    if (document.id !== documentId) {
+      documentId = document.id
+      void context.workspace.get().then((workspace) => {
+        if (disposed || context.editor.getDocument()?.id !== document.id) return
+        activePath = workspace?.activePath ?? null
+        queueMetadata(document)
+      })
+    } else queueMetadata(document)
+  })
 
   class Component {
     private cleanups: (() => void)[] = []
@@ -273,12 +464,22 @@ export function createObsidianApi(
       this.register(() => ref.off())
     }
     unload() {
+      let failure: unknown
       try {
         this.onunload()
+      } catch (error) {
+        failure = error
       } finally {
-        for (const cleanup of this.cleanups.reverse()) cleanup()
+        for (const cleanup of this.cleanups.reverse()) {
+          try {
+            cleanup()
+          } catch (error) {
+            failure ??= error
+          }
+        }
         this.cleanups = []
       }
+      if (failure) throw failure
     }
   }
 
@@ -298,6 +499,10 @@ export function createObsidianApi(
 
   const app = {
     vault,
+    metadataCache,
+    get fileManager(): never {
+      return unsupported('App.fileManager')
+    },
     workspace: {
       getActiveViewOfType(type: unknown) {
         return type === MarkdownView && context.editor.getDocument()
@@ -305,8 +510,7 @@ export function createObsidianApi(
           : null
       },
       getActiveFile: () => {
-        const name = context.editor.getDocument()?.name
-        return name ? { name, path: name } : null
+        return activePath ? (files.get(activePath) ?? null) : null
       },
       openLinkText: (link: string) => context.workspace.openFile(link),
     },
@@ -333,9 +537,14 @@ export function createObsidianApi(
         ),
       })
       this.closeDialog = () => dialog.close(null)
+      openDialogs.add(this.closeDialog)
       void dialog.result.then(() => {
-        this.onClose()
-        this.closeDialog = null
+        try {
+          this.onClose()
+        } finally {
+          if (this.closeDialog) openDialogs.delete(this.closeDialog)
+          this.closeDialog = null
+        }
       })
     }
     close() {
@@ -448,7 +657,11 @@ export function createObsidianApi(
         label: title,
         icon: Puzzle,
         tooltip: `${manifest.name}: ${icon}`,
-        onClick: () => callback(new MouseEvent('click')),
+        onClick: () => {
+          const event = new MouseEvent('click')
+          button.dispatchEvent(event)
+          callback(event)
+        },
       })
       this.register(() => handle.dispose())
       return button
@@ -478,6 +691,24 @@ export function createObsidianApi(
       })
       this.register(remove)
     }
+    registerView(): never {
+      return unsupported('Plugin.registerView')
+    }
+    registerMarkdownPostProcessor(): never {
+      return unsupported('Plugin.registerMarkdownPostProcessor')
+    }
+    registerMarkdownCodeBlockProcessor(): never {
+      return unsupported('Plugin.registerMarkdownCodeBlockProcessor')
+    }
+    registerEditorSuggest(): never {
+      return unsupported('Plugin.registerEditorSuggest')
+    }
+    registerObsidianProtocolHandler(): never {
+      return unsupported('Plugin.registerObsidianProtocolHandler')
+    }
+    registerBasesView(): never {
+      return unsupported('Plugin.registerBasesView')
+    }
     loadData() {
       return context.native.query('data', { id: manifest.id })
     }
@@ -488,6 +719,14 @@ export function createObsidianApi(
 
   return {
     app,
+    refreshVault,
+    dispose: () => {
+      disposed = true
+      clearTimeout(metadataTimer)
+      offDocument()
+      for (const close of openDialogs) close()
+      openDialogs.clear()
+    },
     api: {
       Component,
       Plugin,
@@ -517,4 +756,5 @@ export function showPluginSettings(
     ),
   })
   void dialog.result.then(() => tab.hide())
+  return () => dialog.close(null)
 }

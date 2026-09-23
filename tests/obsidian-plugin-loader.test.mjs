@@ -13,10 +13,13 @@ test('loads a browser Obsidian plugin through its bundled Hibi addon', {
   const profile = join(root, 'profile')
   const source = join(root, 'sample-plugin')
   const workspace = join(root, 'notes')
+  const otherWorkspace = join(root, 'other-notes')
   await mkdir(profile)
   await mkdir(source)
   await mkdir(workspace)
+  await mkdir(otherWorkspace)
   await writeFile(join(workspace, 'Note.md'), '# note')
+  await writeFile(join(otherWorkspace, 'Other.md'), '# other')
   await writeFile(
     join(profile, 'addons.json'),
     JSON.stringify({ 'obsidian-plugin-loader': true }),
@@ -66,6 +69,8 @@ module.exports = class Sample extends Plugin {
       window.sampleVaultDone = this.app.vault.getMarkdownFiles().length;
     } });
     this.addSettingTab(new SampleSettings(this.app, this));
+    window.sampleWorkspaceFiles = this.app.vault.getMarkdownFiles().map((file) => file.path);
+    window.sampleHeading = this.app.metadataCache.getFileCache(this.app.vault.getMarkdownFiles()[0])?.headings[0]?.heading;
     window.sampleLoads = (window.sampleLoads || 0) + 1;
   }
   onunload() { window.sampleUnloads = (window.sampleUnloads || 0) + 1; }
@@ -117,6 +122,7 @@ module.exports = class Sample extends Plugin {
   )
   await enable.click()
   await page.waitForFunction(() => window.sampleLoads === 1)
+  assert.equal(await page.evaluate(() => window.sampleHeading), 'note')
   await page.getByText('sample ready', { exact: true }).waitFor()
   await command('Edit sample vault')
   await page.waitForFunction(() => window.sampleVaultDone === 2)
@@ -178,7 +184,16 @@ module.exports = class Sample extends Plugin {
     { value: 'changed' },
   )
   await page.getByRole('dialog').getByRole('button', { name: /close/i }).click()
+  await app.evaluate((_electron, selected) => {
+    globalThis.obsidianSelectedFolder = selected
+  }, otherWorkspace)
+  await page.evaluate(() => window.hibi.openWorkspace())
+  await page.waitForFunction(() => window.sampleLoads === 2)
+  assert.equal(await page.evaluate(() => window.sampleHeading), 'other')
+  assert.deepEqual(await page.evaluate(() => window.sampleWorkspaceFiles), [
+    'Other.md',
+  ])
   await enable.click()
-  await page.waitForFunction(() => window.sampleUnloads === 1)
+  await page.waitForFunction(() => window.sampleUnloads === 2)
   assert.equal(await page.getByText('sample ready', { exact: true }).count(), 0)
 })

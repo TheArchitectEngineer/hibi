@@ -6,4 +6,6 @@ The loader supports browser-compatible plugins that use the available Obsidian A
 
 Supported plugins can register commands, notices, simple modals and settings, status items, toolbar actions, and source-editor extensions. They can list and read Markdown notes in the open workspace, create notes, and modify saved notes. Hibi rejects a write when the note has changed since the plugin read it or any open note has unsaved edits. Rename and trash actions follow Hibi's workspace safeguards.
 
+The bridge also provides basic cached note metadata, including properties, headings, links, embeds, and tags. It reloads plugins when you switch workspaces. Obsidian pane views, Markdown postprocessors, Bases, direct filesystem adapters, Node.js, and Electron APIs are not available. Plugins that call these APIs show a named error instead of running partially.
+
 Obsidian plugins run code in Hibi's renderer and can read or change your notes. Install only plugins you trust. Opening a workspace never installs or enables its plugins automatically.
