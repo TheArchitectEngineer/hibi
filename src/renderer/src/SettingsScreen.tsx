@@ -683,7 +683,6 @@ export function SettingsScreen({
           >
             <DependencySettings
               active={open && category === 'dependencies'}
-              addons={addons}
               states={addonStates}
               openAddon={(id) =>
                 onCategory(

@@ -1,6 +1,6 @@
 # Addon dependencies
 
-Open **Settings → Dependencies** to see the command-line tools requested by your installed addons. Each tool has **Setup**, **Path**, and **Used by** sections. Setup includes its installation guide and availability. Used by lists its addons and whether they are enabled; hover an addon name to see why it needs the tool. Identical requirements share one entry.
+Open **Settings → Dependencies** to see the command-line tools requested by your installed addons. Each tool shows its availability. Expand a tool to see its installation guide, path, and the addons that use it. The addon list shows whether each addon is enabled; hover an addon name to see why it needs the tool. Identical requirements share one entry.
 
 ## Check a tool
 

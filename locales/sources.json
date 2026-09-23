@@ -2286,9 +2286,6 @@
   "f43b94251094": [
     "src/renderer/src/FormatsSettings.tsx"
   ],
-  "ff7a00734638": [
-    "src/renderer/src/DependencySettings.tsx"
-  ],
   "76d861074364": [
     "src/addons/_shared/format-renderer.tsx"
   ],
@@ -3156,8 +3153,7 @@
     "src/renderer/src/DependencySettings.tsx"
   ],
   "09841d79f59e": [
-    "src/addons/_shared/format-renderer.tsx",
-    "src/renderer/src/DependencySettings.tsx"
+    "src/addons/_shared/format-renderer.tsx"
   ],
   "645982c52b7c": [
     "src/ui/SettingsFilter.tsx"
@@ -3379,9 +3375,6 @@
   ],
   "ba1edae91173": [
     "src/renderer/src/SettingsScreen.tsx"
-  ],
-  "7013af4c42fe": [
-    "src/renderer/src/DependencySettings.tsx"
   ],
   "62fdc7379808": [
     "src/addons/discord-presence/Settings.tsx"
@@ -4277,6 +4270,12 @@
   "fc887fc99835": [
     "src/renderer/src/EditorToolbar.tsx"
   ],
+  "ea93d6a262ec": [
+    "src/renderer/src/DependencySettings.tsx"
+  ],
+  "3976b982dd01": [
+    "src/renderer/src/DependencySettings.tsx"
+  ],
   "c9b3c38247f7": [
     "src/addons/diagnostics/Settings.tsx"
   ],
@@ -4645,6 +4644,12 @@
   "241630b9f37f": [
     "src/renderer/src/document-formats.ts"
   ],
+  "613c3abf0f07": [
+    "src/renderer/src/DependencySettings.tsx"
+  ],
+  "960f41e99ca6": [
+    "src/renderer/src/DependencySettings.tsx"
+  ],
   "4d48fba6cf5f": [
     "src/shared/hotkeys.ts"
   ],
@@ -4866,6 +4871,9 @@
   "78d5525c7d41": [
     "src/renderer/src/FormatsSettings.tsx",
     "src/renderer/src/main.tsx"
+  ],
+  "a10bf03bcf08": [
+    "src/renderer/src/DependencySettings.tsx"
   ],
   "1954f44f1495": [
     "src/renderer/src/Titlebar.tsx"

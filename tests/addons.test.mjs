@@ -6,6 +6,51 @@ import test from 'node:test'
 import { electron } from './electron.mjs'
 import { clickMenu } from './keyboard.mjs'
 
+test('vim cursor stays hidden behind the startup screen', {
+  timeout: 30000,
+}, async (t) => {
+  const folder = await mkdtemp(join(tmpdir(), 'hibi-vim-startup-'))
+  const profile = join(folder, 'profile')
+  let app
+  const close = async () => {
+    if (!app) return
+    await app.close()
+    app = null
+  }
+  const launch = async () => {
+    app = await electron.launch({
+      args: [resolve('.'), `--user-data-dir=${profile}`],
+    })
+    const page = await app.firstWindow()
+    page.setDefaultTimeout(6000)
+    await page.locator('.titlebar').waitFor()
+    return page
+  }
+  t.after(async () => {
+    await close()
+    await rm(folder, { recursive: true, force: true })
+  })
+
+  let page = await launch()
+  await clickMenu(app, 'Settings')
+  await page.getByRole('tab', { name: /^editor$/i, exact: true }).click()
+  await page
+    .getByLabel('Default view', { exact: true })
+    .selectOption('markdown')
+  await page.getByRole('tab', { name: /^addons$/i, exact: true }).click()
+  await page.locator('#addon-vim').click()
+  await close()
+
+  page = await launch()
+  await page.getByRole('region', { name: /start writing/i }).waitFor()
+  const cursor = page.locator('.cm-fat-cursor')
+  await cursor.waitFor({ state: 'attached' })
+  assert.equal(
+    await cursor.evaluate((element) => getComputedStyle(element).visibility),
+    'hidden',
+  )
+})
+
 test('plugin pages, metadata, shared controls, and full source vim editing', {
   timeout: 60000,
 }, async (t) => {
