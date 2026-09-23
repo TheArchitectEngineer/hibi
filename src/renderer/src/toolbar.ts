@@ -54,9 +54,14 @@ const publish = () => {
   )
   snapshot = {
     preferences,
-    items: [...items.values()].sort(
-      (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity),
-    ),
+    items: [...items.values()].sort((a, b) => {
+      const aRank = rank.get(a.id) ?? Infinity
+      const bRank = rank.get(b.id) ?? Infinity
+      return aRank === bRank
+        ? Number(b.id.startsWith('format.')) -
+            Number(a.id.startsWith('format.'))
+        : aRank - bRank
+    }),
   }
   for (const listener of listeners) listener()
 }
@@ -107,7 +112,10 @@ export const toolbar = {
   move(id: string, target: string, after = false) {
     if (id === target || !items.has(id) || !items.has(target)) return
     const order = [
-      ...new Set([...(preferences.order ?? []), ...items.keys()]),
+      ...new Set([
+        ...(preferences.order ?? []),
+        ...snapshot.items.map((item) => item.id),
+      ]),
     ].filter((item) => item !== id)
     order.splice(order.indexOf(target) + Number(after), 0, id)
     setPreferences({ order })
