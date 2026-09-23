@@ -14,6 +14,7 @@ import {
 } from 'prosemirror-search'
 import {
   lazy,
+  type MouseEvent,
   Suspense,
   useEffect,
   useLayoutEffect,
@@ -1801,6 +1802,22 @@ export function MarkdownEditor({
     onChange(markdown)
   }
 
+  function followClickedLink(event: MouseEvent<HTMLElement>) {
+    const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+      '.tiptap a[href], .format-content a[href]',
+    )
+    if (
+      !link ||
+      (!link.closest('.format-content') &&
+        !event.shiftKey &&
+        !(event.ctrlKey && event.metaKey))
+    )
+      return
+    event.preventDefault()
+    event.stopPropagation()
+    onLink(link.getAttribute('href')!)
+  }
+
   return (
     <>
       <FindBar
@@ -1823,15 +1840,9 @@ export function MarkdownEditor({
       <main
         className={`editor-panes mode-${paneMode}`}
         data-source-ready={sourceReady}
-        onClickCapture={(event) => {
-          const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(
-            '.tiptap a[href], .format-content a[href]',
-          )
-          if (!link || (!link.closest('.format-content') && !event.shiftKey))
-            return
-          event.preventDefault()
-          event.stopPropagation()
-          onLink(link.getAttribute('href')!)
+        onClickCapture={followClickedLink}
+        onContextMenuCapture={(event) => {
+          if (event.ctrlKey && event.metaKey) followClickedLink(event)
         }}
         onDropCapture={(event) => {
           const files = Array.from(event.dataTransfer.files)
