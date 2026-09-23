@@ -809,9 +809,6 @@
   "a3ef55d8c922": [
     "src/main/links.ts"
   ],
-  "01648c5454ae": [
-    "src/main/updates.ts"
-  ],
   "a7887e68d52e": [
     "src/addons/documentation/ExportDialog.tsx"
   ],
@@ -844,9 +841,6 @@
   ],
   "5bb069eb3188": [
     "src/renderer/src/main.tsx"
-  ],
-  "56bc9cc28f97": [
-    "src/main/updates.ts"
   ],
   "92f776f168d2": [
     "src/renderer/src/main.tsx"
@@ -1160,9 +1154,6 @@
     "src/addons/math/PackageSettings.tsx"
   ],
   "5dd4b9e997ee": [
-    "src/main/updates.ts"
-  ],
-  "dffe083d4d59": [
     "src/main/updates.ts"
   ],
   "4f494b22379b": [
@@ -2709,9 +2700,6 @@
   "9fa7894a6b62": [
     "src/site/main.tsx"
   ],
-  "3503cf221e56": [
-    "src/renderer/src/UpdateSettings.tsx"
-  ],
   "cb30b7d97617": [
     "src/main/local-diagnostics/runtime.ts"
   ],
@@ -2727,9 +2715,6 @@
   ],
   "7bcc1921ca42": [
     "src/addons/discord-presence/rpc.ts"
-  ],
-  "5da69b322815": [
-    "src/main/updates.ts"
   ],
   "80cb8a06e27d": [
     "src/addons/git/native.ts"
@@ -3974,12 +3959,6 @@
   ],
   "bee50784d023": [
     "src/shared/document-edits.ts"
-  ],
-  "d5233922e139": [
-    "src/main/updates.ts"
-  ],
-  "e832fd97f277": [
-    "src/main/updates.ts"
   ],
   "2c9095034e70": [
     "src/shared/updates.ts"

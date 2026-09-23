@@ -71,9 +71,9 @@ Choose **Save a copy** on the recovery screen to keep the draft Hibi still has i
 
 Under **Hibi → Updates**, choose **Recommended nightly** for the latest build that passed every required check, or **Nightly** to also receive builds with failed checks. Recommended nightly is the default. The choice applies across workspaces and stays saved after restarting.
 
-Installed builds check at startup and every six hours. **Check now** checks immediately. Choose **Download update** when a newer build is available, then **Restart and install** on Windows or a Linux AppImage. Hibi asks you to save or discard unsaved edits before restarting; cancelling keeps the app open. Back up your documents before using a nightly.
+Installed builds check at startup and every six hours. **Check now** checks immediately. Choose **Download update** when a newer build is available, then **Restart and install** on macOS, Windows, or a Linux AppImage. Hibi asks you to save or discard unsaved edits before restarting; cancelling keeps the app open. Back up your documents before using a nightly.
 
-On macOS, choose **Open installer** after the download completes, quit Hibi, and drag Hibi into Applications to replace it. Current macOS nightlies require this final installation step. Downloads are verified before installation. Development builds and Linux builds outside an AppImage cannot update themselves.
+On macOS, install Hibi in Applications once. Later updates replace the installed app when you choose **Restart and install**. Downloads are verified before installation. Development builds and Linux builds outside an AppImage cannot update themselves.
 
 Switching channels does not downgrade your installed version. If no build is available yet, or a check or download fails, you can retry from this page.
 

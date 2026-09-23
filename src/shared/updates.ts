@@ -18,17 +18,17 @@ export type UpdateState = {
     | 'downloaded'
     | 'error'
   supported: boolean
-  manualInstall: boolean
   version?: string | undefined
   broken?: boolean | undefined
   progress?: number | undefined
   message: string
 }
+type UpdateAsset = { name: string; sha512: string; size: number }
 export type UpdateRelease = {
   tag: string
   version: string
   status: 'nightly-green' | 'nightly-broken'
-  assets: Record<string, { name: string; sha512: string; size: number }>
+  assets: Record<string, UpdateAsset & { zip?: UpdateAsset }>
 }
 export const UPDATE_URL =
   'https://github.com/schmayterling/hibi/releases/download/'
@@ -60,7 +60,7 @@ export function updateRelease(
     typeof release.assets !== 'object'
   )
     throw new Error('The update feed is invalid. Try again later.')
-  for (const asset of Object.values(release.assets)) {
+  for (const [platform, asset] of Object.entries(release.assets)) {
     if (
       !asset ||
       typeof asset.name !== 'string' ||
@@ -69,6 +69,18 @@ export function updateRelease(
       !/^[A-Za-z0-9+/]{86}==$/.test(asset.sha512) ||
       !Number.isSafeInteger(asset.size) ||
       asset.size <= 0
+    )
+      throw new Error('The update download is invalid. Try again later.')
+    if (
+      asset.zip !== undefined &&
+      (!asset.zip ||
+        !/^darwin-(arm64|x64)$/.test(platform) ||
+        typeof asset.zip.name !== 'string' ||
+        asset.zip.name !==
+          `hibi-${release.version}-mac-${platform.slice(7)}.zip` ||
+        !/^[A-Za-z0-9+/]{86}==$/.test(asset.zip.sha512) ||
+        !Number.isSafeInteger(asset.zip.size) ||
+        asset.zip.size <= 0)
     )
       throw new Error('The update download is invalid. Try again later.')
   }

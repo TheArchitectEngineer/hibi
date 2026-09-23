@@ -108,13 +108,11 @@ export function UpdateSettings() {
           {state?.status === 'downloaded' && (
             <Button
               id="install-update"
-              aria-label={
-                state.manualInstall ? 'Open installer' : 'Restart and install'
-              }
+              aria-label="Restart and install"
               disabled={waiting}
               onClick={() => void run(() => window.hibi.installUpdate())}
             >
-              {state.manualInstall ? 'Open installer' : 'Restart and install'}
+              Restart and install
             </Button>
           )}
         </SettingRow>

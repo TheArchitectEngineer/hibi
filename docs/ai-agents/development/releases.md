@@ -21,7 +21,7 @@ Only an all-platform `nightly-green` result can update the rolling `nightly-gree
 
 Notes start with the short source SHA, status, platform results, a backup warning, and direct installer links. Every download, including ZIP files, gets a linked SHA256 entry. Changes follow the downloads.
 
-Packages use `com.ryanaque.hibi`, the icons in `electron-builder.yml`, and the regular app's data profile. Save and back up documents before installing. Windows packages are unsigned. macOS packages use ad-hoc signing without notarization. Trusted distribution signing requires separate credentials.
+Packages use `com.ryanaque.hibi`, the icons in `electron-builder.yml`, and the regular app's data profile. Save and back up documents before installing. Windows packages are unsigned. macOS packages use Developer ID signing and notarization so installed apps can replace themselves from signed ZIP updates.
 
 The workflow uses the repository token; only publication has `contents: write`. Release publication requires no extra secret. Set the Actions secret `NIGHTLIES_WEBHOOK_URL` to enable Discord announcements. Test changelogs and announcements with `node --test tests/nightly.test.mjs` and check workflow syntax with `actionlint`.
 

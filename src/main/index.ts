@@ -119,6 +119,7 @@ import {
   getUpdateState,
   installUpdate,
   loadUpdates,
+  onUpdateInstallFailure,
   setUpdateChannel,
   startUpdateChecks,
 } from './updates'
@@ -363,6 +364,10 @@ function createWindow(): void {
     }
   })
   let allowClose = false
+  onUpdateInstallFailure(() => {
+    allowClose = false
+    quitting = false
+  })
   let confirmingClose = false
   let rendererGone = false
   let journalReady = false
@@ -469,6 +474,7 @@ function createWindow(): void {
     else window.show()
   })
   window.on('closed', () => {
+    onUpdateInstallFailure()
     ipcMain.removeListener(DOCUMENT_CHANNELS.flushed, flushed)
     flushRequest?.reject(
       new Error('The editor closed before confirming its changes.'),
