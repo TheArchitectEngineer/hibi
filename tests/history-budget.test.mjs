@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, startupDiagnostics } from './electron.mjs'
 import { pressShortcut } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 
@@ -71,7 +71,42 @@ test('combined history pressure preserves inactive drafts and active source undo
   })
   const page = await app.firstWindow()
   page.setDefaultTimeout(6000)
-  await page.waitForFunction(() => !!window.historyFixture)
+  try {
+    await page.waitForFunction(() => !!window.historyFixture)
+  } catch (error) {
+    let timer
+    try {
+      const addon = page.evaluate(async () => {
+        const state = (await window.hibi?.getAddonStates())?.find(
+          (entry) => entry.id === 'history-fixture',
+        )
+        return {
+          fixture: !!window.historyFixture,
+          hibi: !!window.hibi,
+          discovered: !!state,
+          enabled: state?.enabled,
+        }
+      })
+      const [startup, state] = await Promise.all([
+        startupDiagnostics(app, page),
+        Promise.race([
+          addon.catch(() => ({ unavailable: true })),
+          new Promise((resolve) => {
+            timer = setTimeout(() => resolve({ unavailable: true }), 1000)
+          }),
+        ]),
+      ])
+      console.error(
+        'history fixture startup:',
+        JSON.stringify({ startup, state }),
+      )
+    } catch {
+      // Keep the original wait failure if diagnostics cannot run.
+    } finally {
+      clearTimeout(timer)
+    }
+    throw error
+  }
   await page
     .getByRole('textbox', { name: 'Document editor', exact: true })
     .waitFor()

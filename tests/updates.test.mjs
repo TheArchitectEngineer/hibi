@@ -553,10 +553,10 @@ test('update settings expose both channels, persist choice, and fit narrow windo
         },
       )
     await showUpdate('available', 0)
-    assert.equal(
-      await page.locator('#install-update-description').textContent(),
-      `An update is available: ${version}`,
-    )
+    await page
+      .locator('#install-update-description')
+      .getByText(`An update is available: ${version}`, { exact: true })
+      .waitFor()
     await showUpdate('downloading', 50)
     const download = page.getByRole('button', {
       name: 'Downloading 50%',

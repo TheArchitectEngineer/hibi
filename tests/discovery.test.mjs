@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { electron } from './electron.mjs'
+import { electron, waitForDocumentEditor } from './electron.mjs'
 import { pressShortcut } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
 
@@ -24,7 +24,7 @@ test('palette discovers settings, addon controls, themes, and formatting without
   const page = await app.firstWindow()
   page.setDefaultTimeout(6000)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await page.getByRole('textbox', { name: /document editor/i }).waitFor()
+  await waitForDocumentEditor(app, page)
   const choose = async (query) => {
     await pressShortcut(app, `${mod}+k`)
     await page.getByRole('combobox', { name: /search commands/i }).fill(query)
