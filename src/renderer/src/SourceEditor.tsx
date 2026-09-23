@@ -416,6 +416,13 @@ export function SourceEditor({
 
   useEffect(() => {
     if (!host.current) return
+    const active = documentRuntime.get()
+    if (
+      !active ||
+      active.tabId !== document.tabId ||
+      active.revision !== document.revision
+    )
+      return
     const language = new Compartment()
     const markdown = () => {
       const {
@@ -788,6 +795,8 @@ export function SourceEditor({
   }, [
     bridge,
     session,
+    document.tabId,
+    document.revision,
     requestFind,
     requestReference,
     resolveReference,
