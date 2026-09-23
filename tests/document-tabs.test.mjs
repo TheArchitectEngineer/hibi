@@ -227,7 +227,7 @@ test('single-file mode guards replacement, closes other tabs safely, and persist
   assert.equal(await readFile(savedDraft, 'utf8'), 'keep this draft')
   await page.keyboard.press('Escape')
   assert.equal(
-    await page.getByRole('tablist', { name: 'Open documents' }).count(),
+    await page.getByRole('tablist', { name: 'Open tabs' }).count(),
     0,
   )
   assert.match(
@@ -301,7 +301,7 @@ test('single-file mode guards replacement, closes other tabs safely, and persist
     false,
   )
   assert.equal(
-    await page.getByRole('tablist', { name: 'Open documents' }).count(),
+    await page.getByRole('tablist', { name: 'Open tabs' }).count(),
     0,
   )
   await clickMenu(app, 'Settings')
@@ -316,7 +316,7 @@ test('single-file mode guards replacement, closes other tabs safely, and persist
       'false',
   )
   await page.keyboard.press('Escape')
-  await page.getByRole('tablist', { name: 'Open documents' }).waitFor()
+  await page.getByRole('tablist', { name: 'Open tabs' }).waitFor()
   await clickMenu(app, 'New')
   await waitForAsync(
     page,

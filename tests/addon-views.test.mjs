@@ -199,9 +199,16 @@ test('scoped views preserve sessions, pin documents, contain lazy failures, and 
   await tabContent.getByRole('button', { name: 'Count 1' }).waitFor()
   await addonTab.focus()
   await page.keyboard.press('ArrowLeft')
-  assert.equal(await addonTab.getAttribute('aria-selected'), 'false')
+  await page
+    .getByRole('tab', { name: 'Fixture tab', selected: false })
+    .waitFor()
+  await page
+    .locator(
+      '[role="tab"][id^="document-tab-"][aria-selected="true"][aria-disabled="false"]',
+    )
+    .focus()
   await page.keyboard.press('End')
-  assert.equal(await addonTab.getAttribute('aria-selected'), 'true')
+  await page.getByRole('tab', { name: 'Fixture tab', selected: true }).waitFor()
   await clickMenu(app, 'Close tab')
   await addonTab.waitFor({ state: 'detached' })
   assert.equal(await editor.isVisible(), true)

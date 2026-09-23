@@ -225,11 +225,6 @@ function App() {
     editorDocument.publish(documentRuntime.get() ?? document)
   }, [document])
   const currentDocument = useRef(document)
-  const lastDocumentTab = useRef(document?.tabId)
-  useEffect(() => {
-    if (lastDocumentTab.current !== document?.tabId) addonViews.selectDocument()
-    lastDocumentTab.current = document?.tabId
-  }, [document?.tabId])
   const shellDocument = useRef(document)
   shellDocument.current = document
   currentDocument.current = documentRuntime.get() ?? document
