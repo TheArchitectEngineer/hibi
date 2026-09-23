@@ -60,6 +60,13 @@ test('large graphs fit padded sidebars and expanded views, resize, zoom and filt
     exact: true,
   })
   await sidebar.getByText(/500 of 500 notes/).waitFor()
+  const cameraScale = async (view) =>
+    Number(
+      (
+        await view.locator('.graph-canvas > svg > g').getAttribute('transform')
+      ).match(/scale\(([^)]+)\)/)[1],
+    )
+  const startingScale = await cameraScale(sidebar)
   const fitted = async (view, count = 500) => {
     await page.waitForFunction(
       ({ element, count }) => {
@@ -85,7 +92,9 @@ test('large graphs fit padded sidebars and expanded views, resize, zoom and filt
       { element: await view.elementHandle(), count },
     )
   }
+  await sidebar.getByRole('button', { name: 'Fit graph' }).click()
   await fitted(sidebar)
+  assert.ok(startingScale > (await cameraScale(sidebar)) * 3)
   const bounds = await sidebar.locator('.graph-canvas').boundingBox()
   const filter = await sidebar
     .getByRole('searchbox', { name: /filter graph notes/i })
@@ -145,17 +154,33 @@ test('large graphs fit padded sidebars and expanded views, resize, zoom and filt
   await sidebar
     .getByRole('button', { name: 'Expand graph', exact: true })
     .click()
-  const expanded = page.getByRole('dialog', { name: /^workspace graph$/i })
+  const expanded = page.getByRole('tabpanel', { name: /^workspace graph$/i })
+  await expanded.getByRole('button', { name: 'Fit graph' }).click()
   await fitted(expanded)
   const expandedBox = await expanded.locator('.graph-canvas').boundingBox()
   assert.ok(expandedBox.width > bounds.width)
   await page.screenshot({ path: 'test-results/expanded-workspace-graph.png' })
-  await page.keyboard.press('Escape')
+  const graphTab = page.getByRole('tab', { name: /^workspace graph$/i })
+  await page.getByRole('tab', { name: /^n000\.md$/i }).click()
   await expanded.waitFor({ state: 'hidden' })
+  await graphTab.click()
+  await expanded.getByRole('button', { name: 'Fit graph' }).click()
+  await fitted(expanded)
+  await page.getByRole('button', { name: 'Close Workspace graph' }).click()
+  await graphTab.waitFor({ state: 'detached' })
   await fitted(sidebar)
   const search = sidebar.getByRole('searchbox', { name: /filter graph notes/i })
   await search.fill('n000')
   await fitted(sidebar, 1)
+  await sidebar.getByRole('button', { name: 'Expand graph' }).click()
+  assert.equal(
+    await expanded
+      .getByRole('searchbox', { name: /filter graph notes/i })
+      .inputValue(),
+    'n000',
+  )
+  await fitted(expanded, 1)
+  await page.getByRole('button', { name: 'Close Workspace graph' }).click()
   assert.equal(
     await sidebar.locator('.graph-canvas').getAttribute('data-labels'),
     'true',
@@ -163,6 +188,45 @@ test('large graphs fit padded sidebars and expanded views, resize, zoom and filt
   await search.fill('no-matching-note')
   await sidebar.getByText('No matching notes', { exact: true }).waitFor()
   await search.fill('')
+  await sidebar.getByRole('button', { name: 'Fit graph' }).click()
   await fitted(sidebar)
+  await sidebar.getByRole('button', { name: 'Expand graph' }).click()
+  await expanded
+    .getByRole('searchbox', { name: /filter graph notes/i })
+    .waitFor()
+  await page.setViewportSize({ width: 768, height: 720 })
+  await expanded.locator('.graph-canvas').waitFor()
+  const inset = await expanded.evaluate((panel) => {
+    const panelBox = panel.getBoundingClientRect()
+    const input = panel.querySelector('input').getBoundingClientRect()
+    const canvas = panel.querySelector('.graph-canvas').getBoundingClientRect()
+    return {
+      left: input.left - panelBox.left,
+      right: panelBox.right - input.right,
+      canvasLeft: canvas.left - panelBox.left,
+    }
+  })
+  assert.ok(inset.left >= 15 && inset.right >= 15)
+  assert.ok(Math.abs(inset.canvasLeft - inset.left) < 1)
+  const expandedSvg = expanded.getByRole('application', {
+    name: 'Workspace graph',
+  })
+  await expandedSvg.click({ position: { x: 5, y: 5 } })
+  assert.equal(
+    await expandedSvg.evaluate((element) => element.matches(':focus-visible')),
+    false,
+  )
+  await page.screenshot({ path: 'test-results/graph-tab-narrow.png' })
+  await page.setViewportSize({ width: 1100, height: 800 })
+  await clickMenu(app, 'Settings')
+  await page.getByRole('tab', { name: 'Addons', exact: true }).click()
+  await page.getByRole('tab', { name: 'Graph', exact: true }).click()
+  const zoomSetting = page.locator('#graph-default-zoom')
+  assert.equal(await zoomSetting.inputValue(), '8')
+  await zoomSetting.fill('4')
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem('graph:default-zoom')),
+    '4',
+  )
   assert.deepEqual(errors, [])
 })

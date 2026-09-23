@@ -171,6 +171,7 @@ test('tags and graph plugins browse/open notes, honor drafts, and clean up when 
   assert.equal(await graph.locator('line').count(), 1)
   const canvas = await graph.locator('.graph-canvas').boundingBox()
   assert.ok(Math.abs(canvas.width - canvas.height) < 1)
+  await graph.getByRole('button', { name: 'Fit graph' }).click()
   const assertCentered = async (view, path) => {
     const circle = view.locator(`[data-node="${path}"] circle`)
     await page.waitForFunction(
@@ -224,27 +225,51 @@ test('tags and graph plugins browse/open notes, honor drafts, and clean up when 
     0,
   )
   await graph.getByRole('button', { name: /expand graph/i }).click()
-  const expanded = page.getByRole('dialog', { name: /workspace graph/i })
+  const expanded = page.getByRole('tabpanel', { name: /workspace graph/i })
   await expanded.locator('[data-node="a.md"]').waitFor()
-  await page.waitForFunction(() => {
-    const rect = document
-      .querySelector('dialog[data-size="wide"]')
-      .getBoundingClientRect()
-    return (
-      rect.x > 0 &&
-      rect.y > 0 &&
-      rect.width < innerWidth &&
-      rect.height < innerHeight
-    )
-  })
-  assert.equal(await graph.locator('.graph-canvas').count(), 0)
+  assert.equal(await graph.locator('.graph-canvas').count(), 1)
+  await expanded.getByRole('button', { name: 'Fit graph' }).click()
   await centerNode(expanded, 'a.md')
   assert.equal(await expanded.isVisible(), true)
   await centerNode(expanded, 'b.md', true)
   assert.equal(await expanded.isVisible(), true)
-  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Close Workspace graph' }).click()
   await expanded.waitFor({ state: 'hidden' })
   await graph.locator('.graph-canvas').waitFor()
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  await page.evaluate(() => {
+    window.graphCameraSamples = []
+    window.graphCameraComplete = false
+    const started = performance.now()
+    let changedAt = null
+    const sample = () => {
+      const active = document.querySelector(
+        '.addon-sidebar [data-node][data-active="true"]',
+      )?.dataset.node
+      if (changedAt === null && active === 'a.md') changedAt = performance.now()
+      if (changedAt !== null)
+        window.graphCameraSamples.push(
+          document
+            .querySelector('.addon-sidebar .graph-canvas > svg > g')
+            ?.getAttribute('transform'),
+        )
+      if (
+        performance.now() - started < 5000 &&
+        (changedAt === null || performance.now() - changedAt < 400)
+      )
+        requestAnimationFrame(sample)
+      else window.graphCameraComplete = true
+    }
+    requestAnimationFrame(sample)
+  })
+  await page.getByRole('tab', { name: /^a\.md$/i, exact: true }).click()
+  await page.waitForFunction(() => window.graphCameraComplete)
+  assert.ok(
+    new Set(await page.evaluate(() => window.graphCameraSamples)).size >= 4,
+  )
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.getByRole('tab', { name: /^b\.md$/i, exact: true }).click()
+  await assertCentered(graph, 'b.md')
   await graph
     .getByRole('searchbox', { name: /filter graph notes/i })
     .fill('orphan')
@@ -256,6 +281,7 @@ test('tags and graph plugins browse/open notes, honor drafts, and clean up when 
     () => document.querySelectorAll('[data-node]').length === 3,
   )
   const transform = () => graph.locator('svg > g').getAttribute('transform')
+  await graph.getByRole('button', { name: /^fit graph$/i, exact: true }).click()
   const before = await transform()
   await graph.getByRole('button', { name: /^zoom in$/i, exact: true }).click()
   assert.notEqual(await transform(), before)

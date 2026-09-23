@@ -224,6 +224,9 @@
   "77e90b89c040": [
     "src/addons/discord-presence/Settings.tsx"
   ],
+  "322883123d96": [
+    "src/addons/graph/Settings.tsx"
+  ],
   "31e392d1c037": [
     "src/addons/math/engine.ts",
     "src/addons/mermaid/Block.tsx",
@@ -965,6 +968,9 @@
   ],
   "99f5151884f2": [
     "src/renderer/src/SettingsScreen.tsx"
+  ],
+  "fbd284f4229f": [
+    "src/addons/graph/Settings.tsx"
   ],
   "837dbb2c66b1": [
     "src/renderer/src/FormattingToolbar.tsx"
@@ -4563,7 +4569,6 @@
   ],
   "1ece63d3ba1b": [
     "src/addons/graph/Canvas.tsx",
-    "src/addons/graph/Panel.tsx",
     "src/addons/graph/index.tsx"
   ],
   "919644e3d358": [

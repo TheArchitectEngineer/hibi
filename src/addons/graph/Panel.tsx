@@ -10,14 +10,15 @@ export function GraphPanel({
   context,
   expandedView = false,
   initialQuery = '',
+  onExpand,
 }: {
   context: AddonContext
   expandedView?: boolean
   initialQuery?: string
+  onExpand?: (query: string) => void
 }) {
   const { snapshot, workspace, loading, error } = useWorkspaceSnapshot(context)
   const [query, setQuery] = useState(initialQuery)
-  const [expanded, setExpanded] = useState(false)
   const previous = useRef<ReturnType<typeof noteGraph> | null>(null)
   const full = useMemo(() => {
     const next = noteGraph(snapshot?.pages ?? [])
@@ -68,19 +69,8 @@ export function GraphPanel({
   const open = (path: string) => {
     void context.workspace.openFile(path)
   }
-  const expand = () => {
-    setExpanded(true)
-    const dialog = context.dialogs.open({
-      title: 'Workspace graph',
-      size: 'wide',
-      content: () => (
-        <GraphPanel context={context} expandedView initialQuery={query} />
-      ),
-    })
-    void dialog.result.then(() => setExpanded(false))
-  }
   return (
-    <Panel className={`graph-panel${expandedView ? ' graph-modal' : ''}`}>
+    <Panel className={`graph-panel${expandedView ? ' graph-tab' : ''}`}>
       <ControlRow className="graph-controls">
         <TextInput
           type="search"
@@ -119,14 +109,13 @@ export function GraphPanel({
             {graph.edges.length === 1 ? 'connection' : 'connections'}
             {graph.total > 500 ? ' · filter to see more notes' : ''}
           </p>
-          {expanded ? (
-            <div className="graph-expanded-placeholder" />
-          ) : graph.nodes.length ? (
+          {graph.nodes.length ? (
             <GraphCanvas
               graph={graph}
               active={workspace.activePath}
               open={open}
-              expand={expandedView ? undefined : expand}
+              resetKey={`${workspace.id ?? workspace.name}:${query}`}
+              expand={onExpand ? () => onExpand(query) : undefined}
             />
           ) : (
             <PanelMessage
