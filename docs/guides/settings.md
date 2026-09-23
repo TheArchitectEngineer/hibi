@@ -32,7 +32,7 @@ Under **Hotkeys**, select a binding and press a new shortcut. Enter saves it and
 
 ## Sidebar views
 
-The dropdown beside the sidebar button lists available views. Use its first item to pin or unpin the current view; you can pin up to three. **On this page** shows the document's headings and highlights your current section. See [workspaces](workspaces.md) for navigation and resizing.
+The dropdown beside the sidebar button lists available views. Use its first item to pin or unpin a titlebar tab for the current view; you can pin up to three. **On this page** shows the document's headings and highlights your current section. See [workspaces](workspaces.md) for navigation and resizing.
 
 The right sidebar starts collapsed with no view selected. Use **Toggle right sidebar**, then **Right sidebar views** to choose **On this page** or an enabled addon view. Choose **No view** to clear it. Its selection and width are saved separately from the left sidebar. You can assign **Toggle right sidebar** a shortcut under Hotkeys.
 

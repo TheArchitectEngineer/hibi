@@ -177,7 +177,7 @@ export function Titlebar({
                       items: [
                         {
                           id: 'pin-current-view',
-                          label: `${currentPinned ? 'Unpin' : 'Pin'} ${currentView?.label ?? 'Workspace'}`,
+                          label: `${currentPinned ? 'Unpin' : 'Pin'} ${currentView?.label ?? 'Workspace'} tab`,
                           icon: currentPinned ? PinOff : Pin,
                           disabled: !currentPinned && availablePins.length >= 3,
                           onSelect: togglePin,
