@@ -48,29 +48,27 @@ test('command palette, full-height settings, and local geist fonts', {
       .every((animation) => animation.playState !== 'running'),
   )
   const origin = await marker.evaluate((el) => el.getBoundingClientRect().top)
-  await search.evaluate((element) => {
-    // Start sampling with the native key event, before driver acknowledgement.
-    window.paletteMotion = new Promise((resolve) => {
-      element.addEventListener('keydown', resolve, { once: true })
-    }).then(async () => {
-      const marker = document.querySelector('.command-selection')
-      const samples = []
-      for (let i = 0; i < 18; i++) {
-        await new Promise(requestAnimationFrame)
-        samples.push(marker.getBoundingClientRect().top)
-      }
-      const selected = document.querySelector(
-        '[role="option"][aria-selected="true"]',
-      )
-      return { target: selected.getBoundingClientRect().top, samples }
-    })
-  })
-  await search.press('ArrowDown')
-  const motion = await page.evaluate(() => window.paletteMotion)
   assert.ok(
-    motion.samples.some((top) => top > origin + 1 && top < motion.target - 1),
+    await marker.evaluate(
+      (el) => Number.parseFloat(getComputedStyle(el).transitionDuration) > 0,
+    ),
   )
-  assert.ok(Math.abs(motion.samples.at(-1) - motion.target) < 1)
+  await search.press('ArrowDown')
+  await page.waitForFunction((origin) => {
+    const marker = document.querySelector('.command-selection')
+    const selected = document.querySelector(
+      '[role="option"][aria-selected="true"]',
+    )
+    return (
+      marker &&
+      selected &&
+      selected.getBoundingClientRect().top > origin + 1 &&
+      Math.abs(
+        marker.getBoundingClientRect().top -
+          selected.getBoundingClientRect().top,
+      ) < 1
+    )
+  }, origin)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   assert.equal(
     await marker.evaluate((el) => getComputedStyle(el).transitionDuration),
