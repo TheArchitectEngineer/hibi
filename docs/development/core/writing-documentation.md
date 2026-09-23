@@ -2,7 +2,7 @@
 
 Put reader-facing guides in `docs/`. Use `docs/development/addons/` for addon authors and `docs/development/core/` for app contributors. Internal agent instructions and investigation notes belong in `docs/ai-agents/`, which is excluded from the published site.
 
-Write complete sentences and paragraphs. Explain what someone needs to do, and omit details that do not help them use or develop the feature. Use short labels for controls and lists for steps or choices. Keep implementation details in the development guides.
+Write complete sentences. Explain what someone needs to do, and omit details that do not help them use or develop the feature. If one sentence is enough, stop there. Use short labels for controls and lists for steps or choices. Keep implementation details in the development guides.
 
 ## Update the API reference
 
