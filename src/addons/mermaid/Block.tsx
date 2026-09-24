@@ -95,7 +95,7 @@ export function mermaidNode(context: AddonContext) {
         {error ? (
           <DocumentNotice title="Diagram unavailable" message={error} />
         ) : image ? (
-          <img src={image} alt="Mermaid diagram" />
+          <img className="mermaid-diagram" src={image} alt="Mermaid diagram" />
         ) : (
           <DocumentNotice title="Rendering diagram…" busy />
         )}

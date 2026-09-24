@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { electron, waitForDocumentEditor } from './electron.mjs'
-import { pressShortcut } from './keyboard.mjs'
+import { clickMenu, pressShortcut } from './keyboard.mjs'
 
 test('Mermaid and BBCode edit, preview, and export without executing content', {
   timeout: 90000,
@@ -59,13 +59,34 @@ test('Mermaid and BBCode edit, preview, and export without executing content', {
       .getByRole('textbox', { name: `${label} editor`, exact: true })
       .waitFor()
   }
-  await open('diagram.mmd', 'flowchart LR\n  A[Start] --> B[Finish]', 'Mermaid')
+  await open(
+    'diagram.mmd',
+    `flowchart TD
+  A0 --> A1 --> A2 --> A3 --> A4 --> A5 --> A6 --> A7 --> A8 --> A9 --> A10 --> A11 --> A12`,
+    'Mermaid',
+  )
   const diagram = page.locator('.format-content img')
   await diagram.waitFor()
   assert.match(await diagram.getAttribute('src'), /^data:image\/svg\+xml,/)
   assert.ok(
     await diagram.evaluate((image) => image.complete && image.naturalWidth > 0),
   )
+  assert.equal(
+    await diagram.evaluate((image) => getComputedStyle(image).maxHeight),
+    '480px',
+  )
+  assert.ok((await diagram.boundingBox()).height <= 480)
+  await clickMenu(app, 'Settings')
+  await page.getByRole('tab', { name: /^mermaid$/i, exact: true }).click()
+  const maxHeight = page.getByLabel(/^maximum height$/i, { exact: true })
+  for (let index = 0; index < 6; index++) await maxHeight.press('ArrowLeft')
+  assert.equal(await maxHeight.inputValue(), '240')
+  await page.getByRole('button', { name: /^back to app$/i }).click()
+  assert.equal(
+    await diagram.evaluate((image) => getComputedStyle(image).maxHeight),
+    '240px',
+  )
+  assert.ok((await diagram.boundingBox()).height <= 240)
   assert.equal(
     await page.getByRole('button', { name: /^normal$/i }).isDisabled(),
     true,
@@ -92,7 +113,9 @@ test('Mermaid and BBCode edit, preview, and export without executing content', {
     await page.locator('.format-preview .document-notice').allTextContents(),
     [],
   )
-  assert.match(await readFile(exported, 'utf8'), /data:image\/svg\+xml/)
+  const exportedDiagram = await readFile(exported, 'utf8')
+  assert.match(exportedDiagram, /data:image\/svg\+xml/)
+  assert.match(exportedDiagram, /max-height:240px/)
   await open(
     'post.bbcode',
     '[b]bold [i]nested[/i][/b]\n[code][b]literal[/b][/code]\n[url=javascript:alert(1)]unsafe[/url]\n<img src=x onerror="window.compromised=true">',

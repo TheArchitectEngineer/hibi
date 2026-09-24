@@ -2365,6 +2365,9 @@
   "a1a5936d3b0f": [
     "src/addons/diagnostics/Settings.tsx"
   ],
+  "e267f9e8e1e0": [
+    "src/addons/mermaid/Settings.tsx"
+  ],
   "4d57c0cd6794": [
     "src/addons/diagnostics/Settings.tsx"
   ],
@@ -3345,6 +3348,9 @@
   ],
   "23e39291d613": [
     "src/renderer/src/RecoveryScreen.tsx"
+  ],
+  "991c3fbf7f31": [
+    "src/addons/mermaid/Settings.tsx"
   ],
   "49c266baaaa7": [
     "src/addons/math/PackageSettings.tsx"
@@ -4839,6 +4845,7 @@
     "src/renderer/src/addon-overrides.ts"
   ],
   "6ee2cc105a67": [
+    "src/addons/mermaid/Settings.tsx",
     "src/renderer/src/SettingsScreen.tsx"
   ],
   "b2d69362d754": [

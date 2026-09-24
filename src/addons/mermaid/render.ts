@@ -39,5 +39,5 @@ export async function renderDiagram(source: string) {
     USE_PROFILES: { svg: true, svgFilters: true },
     FORBID_TAGS: ['foreignObject', 'a', 'image'],
   })
-  return `<img alt="Mermaid diagram" src="data:image/svg+xml,${encodeURIComponent(clean)}">`
+  return `<img class="mermaid-diagram" alt="Mermaid diagram" src="data:image/svg+xml,${encodeURIComponent(clean)}">`
 }
