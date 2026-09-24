@@ -14,9 +14,6 @@
   "33443aba490a": [
     "src/renderer/src/markdown-syntax.ts"
   ],
-  "d628cf044c3b": [
-    "src/addons/github-markdown/index.ts"
-  ],
   "50b7ba42fd77": [
     "src/renderer/src/markdown-syntax.ts"
   ],
@@ -99,9 +96,6 @@
   "8f6ef239c5ff": [
     "src/renderer/src/ModalEditingSettings.tsx"
   ],
-  "f115ff5e0175": [
-    "src/addons/github-markdown/manifest.ts"
-  ],
   "d3629db00997": [
     "src/addons/frontmatter/index.ts"
   ],
@@ -150,11 +144,9 @@
   "7e778f24c85b": [
     "src/renderer/src/DependencySettings.tsx"
   ],
-  "f62e9267d196": [
-    "src/addons/github-markdown/index.ts"
-  ],
   "0a8ddfae4889": [
-    "src/addons/github-markdown/flavor-info.ts"
+    "src/addons/markdown/github-flavor-info.ts",
+    "src/addons/markdown/index.tsx"
   ],
   "b1295e49f642": [
     "src/addons/git/Panel.tsx"
@@ -305,6 +297,13 @@
   ],
   "dc9c6093b76f": [
     "src/renderer/src/RecoveryScreen.tsx"
+  ],
+  "9a422bd8b132": [
+    "src/renderer/src/main.tsx"
+  ],
+  "b4278c6aa5a4": [
+    "src/renderer/src/AddonSidebar.tsx",
+    "src/renderer/src/BacklinksSidebar.tsx"
   ],
   "b4276963bf99": [
     "src/addons/block-drag/index.ts"
@@ -792,6 +791,9 @@
   ],
   "d835039d17f2": [
     "src/renderer/src/SettingsScreen.tsx"
+  ],
+  "31fbef162594": [
+    "src/renderer/src/main.tsx"
   ],
   "97b0c61b99f6": [
     "src/renderer/src/HibiSettings.tsx"
@@ -1742,9 +1744,6 @@
   "803a679b5fa2": [
     "src/addons/git/decorations.ts"
   ],
-  "f7b6719861d1": [
-    "src/addons/github-markdown/manifest.ts"
-  ],
   "9dcff3687fbb": [
     "src/renderer/src/AddonSettings.tsx"
   ],
@@ -1815,6 +1814,9 @@
   ],
   "afea9e504cf0": [
     "src/main/index.ts"
+  ],
+  "3901114f50bd": [
+    "src/renderer/src/main.tsx"
   ],
   "484084673209": [
     "src/renderer/src/WorkspaceSettings.tsx"
@@ -2658,9 +2660,6 @@
   "e3ebaa16dd9d": [
     "src/renderer/src/DependencySettings.tsx"
   ],
-  "c45165c4120e": [
-    "src/addons/github-markdown/index.ts"
-  ],
   "8ec5e108fc99": [
     "src/addons/tags/Panel.tsx"
   ],
@@ -3289,6 +3288,9 @@
     "src/addons/review/index.tsx",
     "src/addons/review/manifest.ts"
   ],
+  "8e4806ed8b01": [
+    "src/renderer/src/main.tsx"
+  ],
   "5f3ceab57e9e": [
     "src/addons/git/manifest.ts"
   ],
@@ -3480,7 +3482,8 @@
     "src/addons/discord-presence/Settings.tsx"
   ],
   "886bcbd93207": [
-    "src/addons/tags/decorations.ts"
+    "src/addons/tags/decorations.ts",
+    "src/addons/tags/rich-decorations.ts"
   ],
   "7d583b20c446": [
     "src/renderer/src/main.tsx"
@@ -3739,7 +3742,6 @@
     "src/renderer/src/SettingsScreen.tsx"
   ],
   "9aabbcb2c18d": [
-    "src/addons/github-markdown/index.ts",
     "src/renderer/src/FormattingToolbar.tsx"
   ],
   "cd512a33cc6f": [
@@ -3780,9 +3782,6 @@
     "src/addons/slash-commands/commands.ts",
     "src/renderer/src/FormattingToolbar.tsx"
   ],
-  "e3fe2a3fe52c": [
-    "src/addons/github-markdown/index.ts"
-  ],
   "45cb20fc920a": [
     "src/addons/tags/Panel.tsx"
   ],
@@ -3795,9 +3794,6 @@
   ],
   "6e7e4b8b6873": [
     "src/addons/tags/index.tsx"
-  ],
-  "b9eba08fc005": [
-    "src/addons/github-markdown/index.ts"
   ],
   "b846ef5125c2": [
     "src/addons/slash-commands/commands.ts"
@@ -4078,6 +4074,9 @@
   "b22c9541adab": [
     "src/main/updates.ts"
   ],
+  "842b90180293": [
+    "src/main/links.ts"
+  ],
   "70ccfc9c9dd2": [
     "src/main/index.ts"
   ],
@@ -4242,6 +4241,9 @@
   "28d14c9029bb": [
     "src/renderer/src/main.tsx"
   ],
+  "4396b1d0a374": [
+    "src/renderer/src/Editor.tsx"
+  ],
   "6a25699e5870": [
     "src/addons/typing-speed/index.ts"
   ],
@@ -4332,9 +4334,15 @@
   "86ea554aa48a": [
     "src/main/updates.ts"
   ],
+  "d1390befc2e8": [
+    "src/renderer/src/main.tsx"
+  ],
   "cf536ea00613": [
     "src/renderer/src/addon-views.ts",
     "src/renderer/src/addons.ts"
+  ],
+  "20cfcb2cec56": [
+    "src/main/links.ts"
   ],
   "78c4a3ab448e": [
     "src/main/workspace.ts"
@@ -4644,6 +4652,9 @@
   ],
   "a7d3310ed7a2": [
     "src/main/updates.ts"
+  ],
+  "39965152019f": [
+    "src/addons/markdown/flavor-info.ts"
   ],
   "19734a1b58ca": [
     "src/renderer/src/SettingsScreen.tsx"
@@ -5013,9 +5024,6 @@
   ],
   "da55d16fc16f": [
     "src/addons/text-extras/flavor-info.ts"
-  ],
-  "09389e488f6a": [
-    "src/addons/github-markdown/index.ts"
   ],
   "3ca172ad5570": [
     "src/addons/diagnostics/Settings.tsx"

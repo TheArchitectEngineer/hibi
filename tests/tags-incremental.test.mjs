@@ -8,10 +8,10 @@ import { EditorState } from '@tiptap/pm/state'
 import {
   frontmatterPrefix,
   frontmatterState,
-  richTags,
   sourceTagRanges,
   updateFrontmatterState,
 } from '../src/addons/tags/decorations.ts'
+import { richTags } from '../src/addons/tags/rich-decorations.ts'
 import { scheduleTagCounts } from '../src/addons/tags/schedule.ts'
 import { tagMatches } from '../src/addons/tags/syntax.ts'
 

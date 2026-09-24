@@ -6,7 +6,6 @@ import test from 'node:test'
 import { electron } from './electron.mjs'
 import { pressShortcut } from './keyboard.mjs'
 import { waitForAsync } from './poll.mjs'
-import { uiName } from './ui.mjs'
 
 test('tags do not scan whole Markdown source when source editor scrolls', {
   timeout: 45000,
@@ -39,17 +38,6 @@ test('tags do not scan whole Markdown source when source editor scrolls', {
   page.setDefaultTimeout(6500)
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
   await page.getByRole('textbox', { name: /document editor/i }).waitFor()
-  await pressShortcut(app, `${mod}+k`)
-  await page
-    .getByRole('combobox', { name: /search commands/i })
-    .fill('enable tags')
-  await page
-    .getByRole('option')
-    .filter({
-      has: page.getByText(uiName('enable tags', true), { exact: true }),
-    })
-    .first()
-    .click()
   await waitForAsync(page, async () =>
     (await window.hibi.getAddonStates()).some(
       (addon) => addon.id === 'tags' && addon.enabled,
