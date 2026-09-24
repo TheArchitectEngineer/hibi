@@ -31,6 +31,8 @@ const instances = new Map<string, ViewEntry>()
 const listeners = new Set<() => void>()
 let activePanel: string | null = null
 let activeTab: string | null = null
+let activeStart: string | null = null
+let startOrder: string[] = []
 let activeSidebar: string | null = null
 let activeRightSidebar: string | null = null
 let focusTarget: string | null = null
@@ -39,6 +41,7 @@ let snapshot: {
   instances: ViewEntry[]
   activePanel: string | null
   activeTab: string | null
+  activeStart: string | null
   activeSidebar: string | null
   activeRightSidebar: string | null
   focusTarget: string | null
@@ -47,6 +50,7 @@ let snapshot: {
   instances: [],
   activePanel,
   activeTab,
+  activeStart,
   activeSidebar,
   activeRightSidebar,
   focusTarget,
@@ -57,6 +61,7 @@ const publish = () => {
     instances: [...instances.values()],
     activePanel,
     activeTab,
+    activeStart,
     activeSidebar,
     activeRightSidebar,
     focusTarget,
@@ -81,8 +86,9 @@ function open(
     throw new Error('This view is no longer available.')
   const panel = definition.location === 'panel'
   const tab = definition.location === 'tab'
+  const start = definition.location === 'start'
   const side =
-    panel || tab ? 'left' : (options.side ?? definition.side ?? 'left')
+    panel || tab || start ? 'left' : (options.side ?? definition.side ?? 'left')
   if (!['left', 'right'].includes(side))
     throw new Error('Invalid sidebar side.')
   const localId = options.id ?? 'default'
@@ -90,7 +96,7 @@ function open(
     throw new Error('Invalid view instance ID.')
   const id = `${definition.id}:${side === 'right' ? 'right:' : ''}${localId}`
   const select = () => {
-    if (tab) return
+    if (tab || start) return
     if (side === 'right') activeRightSidebar = id
     else activeSidebar = id
   }
@@ -123,7 +129,10 @@ function open(
       if (!instances.has(id)) return
       if (panel) activePanel = id
       else if (tab) activeTab = id
-      else select()
+      else if (start) {
+        startOrder = [...startOrder.filter((entry) => entry !== id), id]
+        activeStart = id
+      } else select()
       publish()
       if (tab) definition.environment.openTab()
       else if (!panel) definition.environment.openSidebar(definition.id, side)
@@ -148,9 +157,13 @@ function open(
       }
       if (panel && activePanel === id) activePanel = null
       else if (tab && activeTab === id) activeTab = null
-      else if (
+      else if (start) {
+        startOrder = startOrder.filter((entry) => entry !== id)
+        activeStart = startOrder.at(-1) ?? null
+      } else if (
         !panel &&
         !tab &&
+        !start &&
         (side === 'right' ? activeRightSidebar : activeSidebar) === id
       ) {
         if (side === 'right') activeRightSidebar = null
@@ -214,7 +227,8 @@ export const addonViews = {
     if (
       !/^[a-z][a-z0-9-]*$/.test(view.id) ||
       definitions.has(id) ||
-      (view.location && !['sidebar', 'panel', 'tab'].includes(view.location)) ||
+      (view.location &&
+        !['sidebar', 'panel', 'tab', 'start'].includes(view.location)) ||
       (view.side && !['left', 'right'].includes(view.side)) ||
       (view.lifetime && !['visible', 'session'].includes(view.lifetime))
     )
@@ -222,6 +236,7 @@ export const addonViews = {
     const definition = { ...view, id, owner, environment }
     definitions.set(id, definition)
     publish()
+    if (view.location === 'start') open(definition, { focus: false })
     return {
       open: (options) => open(definition, options),
       dispose() {
@@ -231,7 +246,8 @@ export const addonViews = {
           // Removing an addon leaves the shared sidebar open for its workspace fallback.
           if (
             entry.definition.location === 'panel' ||
-            entry.definition.location === 'tab'
+            entry.definition.location === 'tab' ||
+            entry.definition.location === 'start'
           )
             entry.handle.close()
           else {
