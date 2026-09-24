@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { type FSWatcher, type Stats, watch } from 'node:fs'
-import { lstat, readdir, realpath } from 'node:fs/promises'
+import { lstat, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, isAbsolute, join, parse, relative, sep } from 'node:path'
 import { app, type BrowserWindow, dialog, shell } from 'electron'
 import ignore from 'ignore'
@@ -27,6 +27,13 @@ import {
   getKnownWorkspaces,
   rememberWorkspace,
 } from './recent-workspaces'
+import {
+  type CachedIndexPage,
+  diskIndexVersion,
+  needsIndexVerification,
+  readIndexPage,
+} from './workspace-index-cache'
+import { LatestIndexJob } from './workspace-index-job'
 import { workspaceIgnore, workspaceMetadata } from './workspace-metadata'
 import { createScanCoordinator, watchNeedsScan } from './workspace-refresh'
 import { showAllWorkspaceFiles } from './workspace-settings'
@@ -57,6 +64,55 @@ const acknowledgedPaths = new Map<
   { fingerprint: string | null; expires: number }
 >()
 let onChanged: (change: WorkspaceChange) => void = () => {}
+let indexRevision = 0
+let cachedRoot: string | null = null
+let cachedPages = new Map<string, CachedIndexPage>()
+let dirtyIndexPaths: Set<string> | null = null
+let cachedIndexKey: string | null = null
+let cachedIndexPages: WorkspaceIndex['pages'] | null = null
+type IndexDraft = ReturnType<typeof getOpenDocuments>[number]
+type IndexRequest = {
+  key: string
+  selected: string
+  workspace: WorkspaceState
+  drafts: Map<string, IndexDraft>
+  revision: number
+}
+const indexJob = new LatestIndexJob(captureIndexRequest, runIndexRequest)
+
+function indexedContentPath(path: string): boolean {
+  if (cachedPages.has(path)) return true
+  if (!isDocumentName(basename(path), true)) return false
+  if (cachedEntry(path)?.kind === 'file') return true
+  const selected = root
+  if (
+    !selected ||
+    !relevantWatchPath(path) ||
+    path.split('/').includes('node_modules') ||
+    ignoredPaths?.ignores(path)
+  )
+    return false
+  return getOpenDocuments().some(
+    (draft) =>
+      draft.pendingPath && relativePath(selected, draft.pendingPath) === path,
+  )
+}
+
+function publishWorkspaceChange(change: WorkspaceChange) {
+  if (
+    change.kind === 'tree' ||
+    change.paths === null ||
+    cachedRoot !== root ||
+    change.paths.some(indexedContentPath)
+  ) {
+    if (change.paths === null) dirtyIndexPaths = null
+    else if (dirtyIndexPaths)
+      for (const path of change.paths) dirtyIndexPaths.add(path)
+    indexRevision++
+    indexJob.invalidate()
+  }
+  onChanged(change)
+}
 
 export function workspaceRoot(): string | null {
   return root
@@ -127,13 +183,15 @@ export async function scanWorkspace(
   return walk(base)
 }
 
-export function getWorkspace(): WorkspaceState | null {
+export function getWorkspace(
+  open?: ReturnType<typeof getOpenDocuments>,
+): WorkspaceState | null {
   if (!root) return null
+  const documents = open ?? getOpenDocuments()
   const path = getDocumentPath()
   const activePath = path ? relativePath(root, path) : null
   let visible = entries
-  const open = getOpenDocuments()
-  for (const draft of open) {
+  for (const draft of documents) {
     const draftPath = draft.pendingPath && relativePath(root, draft.pendingPath)
     if (!draftPath) continue
     const parts = draftPath.split('/')
@@ -157,7 +215,7 @@ export function getWorkspace(): WorkspaceState | null {
     visible = addDraft(visible, 0)
   }
   const dirty = new Set(
-    open
+    documents
       .filter((draft) => draft.dirty && draft.file)
       .map((draft) => relativePath(root!, draft.file!)),
   )
@@ -257,7 +315,7 @@ export async function notifyWorkspaceContent(
   const selected = root
   if (!selected) return null
   if (paths) await acknowledgePaths(selected, paths)
-  if (root === selected) onChanged({ kind: 'content', paths })
+  if (root === selected) publishWorkspaceChange({ kind: 'content', paths })
   return getWorkspace()
 }
 
@@ -365,7 +423,7 @@ async function flushWatcherEvents(selected: string) {
   if (treePaths.length)
     await requestWorkspaceScan([...treePaths, ...contentPaths])
   else if (contentPaths.length)
-    onChanged({ kind: 'content', paths: contentPaths })
+    publishWorkspaceChange({ kind: 'content', paths: contentPaths })
 }
 
 function atomicTempTarget(path: string): string | null {
@@ -455,11 +513,17 @@ export async function loadWorkspace(
   if (loading !== loadGeneration) return getWorkspace()
   watcher?.close()
   clearTimeout(refreshTimer)
+  indexJob.reset()
   scanCoordinator?.close()
   watcherEvents.clear()
   unknownWatcherEvent = false
   acknowledgedPaths.clear()
   pendingTreePaths = new Set()
+  cachedRoot = null
+  cachedPages.clear()
+  dirtyIndexPaths = null
+  cachedIndexKey = null
+  cachedIndexPages = null
   root = nextRoot
   entries = nextEntries
   manifest = metadata.manifest
@@ -485,7 +549,7 @@ export async function loadWorkspace(
       manifest = next.manifest
       showingAllFiles = next.showAllFiles
       ignoredPaths = next.ignored
-      onChanged({ kind: 'tree', paths: takeTreePaths() })
+      publishWorkspaceChange({ kind: 'tree', paths: takeTreePaths() })
     },
   )
   try {
@@ -503,7 +567,7 @@ export async function loadWorkspace(
   await rememberWorkspace(nextRoot).catch((error: unknown) =>
     console.error('could not remember workspace:', error),
   )
-  onChanged({ kind: 'tree', paths: null })
+  publishWorkspaceChange({ kind: 'tree', paths: null })
   return getWorkspace()
 }
 
@@ -545,6 +609,7 @@ export async function deleteKnownWorkspace(
     loadGeneration += 1
     watcher?.close()
     clearTimeout(refreshTimer)
+    indexJob.reset()
     scanCoordinator?.close()
     scanCoordinator = undefined
     watcher = undefined
@@ -556,9 +621,14 @@ export async function deleteKnownWorkspace(
     entries = []
     manifest = null
     ignoredPaths = null
+    cachedRoot = null
+    cachedPages.clear()
+    dirtyIndexPaths = null
+    cachedIndexKey = null
+    cachedIndexPages = null
   }
   await forgetWorkspace(item.path)
-  onChanged({ kind: 'tree', paths: null })
+  publishWorkspaceChange({ kind: 'tree', paths: null })
   return true
 }
 
@@ -660,20 +730,85 @@ export async function snapshotWorkspace(): Promise<WorkspaceSnapshot> {
   }
 }
 
-export async function indexWorkspace(): Promise<WorkspaceIndex | null> {
+function captureIndexRequest(): { key: string; request: IndexRequest } | null {
   const selected = root
-  const workspace = getWorkspace()
-  if (!selected || !workspace) return null
+  if (!selected) return null
+  const open = getOpenDocuments()
+  const workspace = getWorkspace(open)
+  if (!workspace) return null
   const drafts = new Map(
-    getOpenDocuments().flatMap((draft) => {
+    open.flatMap((draft) => {
       const path = draft.file && relativePath(selected, draft.file)
       return path && draft.dirty ? [[path, draft] as const] : []
     }),
   )
+  const revision = indexRevision
+  const key = JSON.stringify([
+    selected,
+    revision,
+    [...drafts]
+      .map(([path, draft]) => [path, draft.tabId, draft.contentVersion])
+      .sort(([a], [b]) => String(a).localeCompare(String(b))),
+  ])
+  return { key, request: { key, selected, workspace, drafts, revision } }
+}
+
+async function runIndexRequest(
+  request: IndexRequest,
+  current: () => boolean,
+): Promise<WorkspaceIndex> {
+  const { selected, workspace, drafts, revision } = request
+  const pages = await collectIndexPages(
+    selected,
+    workspace.entries,
+    drafts,
+    () => current() && root === selected && indexRevision === revision,
+  )
+  const path = getDocumentPath()
+  const activePath = path ? relativePath(selected, path) : null
+  if (current()) {
+    cachedIndexKey = request.key
+    cachedIndexPages = pages
+  }
+  return { workspace: { ...workspace, activePath }, pages }
+}
+
+export function indexWorkspace(
+  verifyAll = false,
+): Promise<WorkspaceIndex | null> {
+  if (verifyAll && root) {
+    dirtyIndexPaths = null
+    indexRevision++
+    indexJob.invalidate()
+  }
+  const captured = captureIndexRequest()
+  if (!captured) return Promise.resolve(null)
+  if (
+    !indexJob.running &&
+    cachedIndexKey === captured.key &&
+    cachedIndexPages &&
+    dirtyIndexPaths?.size === 0
+  )
+    return Promise.resolve({
+      workspace: captured.request.workspace,
+      pages: cachedIndexPages,
+    })
+  return indexJob.request(captured)
+}
+
+async function collectIndexPages(
+  selected: string,
+  entries: readonly WorkspaceEntry[],
+  drafts: Map<string, IndexDraft>,
+  current: () => boolean,
+): Promise<WorkspaceIndex['pages']> {
+  const previous = cachedRoot === selected ? cachedPages : new Map()
+  const next = new Map<string, CachedIndexPage>()
   const pages: WorkspaceIndex['pages'] = []
   let bytes = 0
   async function collect(items: readonly WorkspaceEntry[]) {
     for (const item of items) {
+      if (!current()) return
       if (item.children) {
         await collect(item.children)
         continue
@@ -682,27 +817,53 @@ export async function indexWorkspace(): Promise<WorkspaceIndex | null> {
       if (!isDocumentName(item.name, true)) continue
       try {
         const draft = drafts.get(item.path)
-        const path =
-          draft?.file ?? (await resolveWorkspaceFile(selected!, item.path))
-        const markdown = draft?.markdown ?? (await readMarkdown(path))
-        bytes += Buffer.byteLength(markdown)
+        const existing = previous.get(item.path)
+        let cached: CachedIndexPage
+        if (
+          !draft &&
+          existing?.version.startsWith('disk:') &&
+          !needsIndexVerification(dirtyIndexPaths, item.path)
+        ) {
+          cached = existing
+        } else {
+          const path =
+            draft?.file ?? (await resolveWorkspaceFile(selected, item.path))
+          let version: string
+          if (draft) {
+            version = `draft:${draft.tabId}:${draft.contentVersion}`
+          } else {
+            const file = await stat(path, { bigint: true })
+            version = diskIndexVersion(file)
+          }
+          cached = await readIndexPage(
+            existing,
+            version,
+            existing?.page.id ??
+              createHash('sha256').update(path).digest('hex'),
+            item.path,
+            () => draft?.markdown ?? readMarkdown(path),
+          )
+        }
+        bytes += cached.bytes
         if (pages.length >= 2000 || bytes > 20 * 1024 * 1024)
           throw new Error(
             'Hibi can index up to 2,000 documents and 20 MiB of text. Open a smaller workspace.',
           )
-        pages.push({
-          id: createHash('sha256').update(path).digest('hex'),
-          path: item.path,
-          markdown,
-        })
+        next.set(item.path, cached)
+        pages.push(cached.page)
       } catch (error) {
         // A concurrent rename/delete can remove a cached entry; the watcher refreshes it.
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
       }
     }
   }
-  await collect(workspace.entries)
-  return root === selected ? { workspace, pages } : null
+  await collect(entries)
+  if (current()) {
+    cachedRoot = selected
+    cachedPages = next
+    dirtyIndexPaths = new Set()
+  }
+  return pages
 }
 
 import { isMarkdownDocument } from '../shared/document-types'
