@@ -926,6 +926,11 @@ function App() {
       if (busyRef.current || dialogs.isOpen()) return false
       if (command === 'undo' || command === 'redo')
         return Boolean(documentRuntime.session()?.[command]())
+      const source =
+        (command === 'save' || command === 'saveAs') &&
+        window.document.activeElement
+          ?.closest('.cm-editor')
+          ?.querySelector<HTMLElement>('.cm-content')
       busyRef.current = true
       setBusy(true)
       setError('')
@@ -950,7 +955,19 @@ function App() {
         return false
       } finally {
         busyRef.current = false
-        setBusy(false)
+        if (source) flushSync(() => setBusy(false))
+        else setBusy(false)
+        if (source)
+          requestAnimationFrame(() => {
+            const active = window.document.activeElement
+            if (
+              (!active ||
+                active === window.document.body ||
+                !active.isConnected) &&
+              source.isConnected
+            )
+              source.focus()
+          })
       }
     },
     [dialogs, acceptDocument, setError],
