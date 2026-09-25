@@ -133,8 +133,33 @@ test('slash commands work in both editors, preserve undo, and coexist with vim',
   assert.equal(await read(), beforeDismiss)
   await rich.pressSequentially('literal')
   assert.equal(await menu.isVisible(), false)
-  await rich.fill('/table')
+  await rich.evaluate((element) => {
+    const editor = element.editor
+    editor.commands.setContent('<p>/table</p>')
+    editor.commands.setTextSelection(7)
+    editor.commands.focus()
+  })
+  assert.equal(await read(), '/table')
   await menu.waitFor()
+  await rich.press('Tab')
+  assert.equal(await rich.locator('table').count(), 1)
+  await rich.evaluate((element) => {
+    const editor = element.editor
+    editor.commands.setContent('<p>/</p>')
+    editor.commands.setTextSelection(2)
+    editor.commands.focus()
+  })
+  await menu.waitFor()
+  await rich.press('Escape')
+  await menu.waitFor({ state: 'hidden' })
+  await rich.evaluate((element) => {
+    const editor = element.editor
+    editor.commands.insertContent('literal')
+    editor.commands.setContent('<p>/table</p>')
+    editor.commands.setTextSelection(7)
+  })
+  await menu.waitFor()
+  assert.match(await menu.innerText(), /Tables/)
   await rich.press('Tab')
   assert.equal(await rich.locator('table').count(), 1)
   // A DOM fill cannot remove the table and quote nodes from earlier commands.
@@ -191,10 +216,22 @@ test('slash commands work in both editors, preserve undo, and coexist with vim',
   assert.match(await menu.innerText(), /No commands found/)
   await source.press('Escape')
 
+  await source.fill('/h2')
+  await menu.waitFor()
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].setContentSize(720, 520),
   )
+  await page.waitForFunction(() => innerWidth === 720 && innerHeight === 520)
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  )
+  await menu.waitFor()
   await source.fill(`${'paragraph\n\n'.repeat(24)}/h2`)
+  await source.press('ArrowLeft')
+  await source.press('ArrowRight')
   await menu.waitFor()
   const bounds = await page
     .locator('.slash-menu:popover-open')

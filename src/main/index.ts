@@ -226,6 +226,20 @@ app.on('open-file', (event, path) => {
 app.on('before-quit', () => {
   quitting = true
 })
+let devRestartRequested = false
+function cancelDevRestart() {
+  if (!devRestartRequested) return
+  devRestartRequested = false
+  process.send?.('hibi:dev-restart-cancelled')
+}
+if (process.env.NODE_ENV_ELECTRON_VITE === 'development')
+  process.on('message', (message: unknown) => {
+    if (message === 'hibi:dev-restart') {
+      devRestartRequested = true
+      process.send?.('hibi:dev-restart-accepted')
+      app.quit()
+    }
+  })
 
 function trustedWindow(
   event: Pick<IpcMainInvokeEvent, 'sender' | 'senderFrame'>,
@@ -474,6 +488,7 @@ function createWindow(): void {
       })
       .finally(() => {
         confirmingClose = false
+        if (!quitting) cancelDevRestart()
       })
   })
   window.once('ready-to-show', () => {

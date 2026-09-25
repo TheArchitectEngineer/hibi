@@ -10,6 +10,8 @@ export type SlashMatch = {
   run: (command: SlashCommand) => void
 }
 
+type SlashObservation = Pick<SlashMatch, 'from' | 'query'>
+
 export function createSlashMenu(
   editor: HTMLElement,
   reposition: () => void,
@@ -56,6 +58,7 @@ export function createSlashMenu(
     attributes.map((name) => [name, editor.getAttribute(name)]),
   )
   let match: SlashMatch | null = null
+  let observed: SlashObservation | null = null
   let dismissed: number | null = null
   let results: SlashCommand[] = []
   let active = 0
@@ -71,8 +74,17 @@ export function createSlashMenu(
     }
   }
   function dismiss() {
-    dismissed = match?.from ?? null
+    dismissed = observed?.from ?? null
     hide()
+  }
+  function observe(next: SlashObservation | null) {
+    if (
+      !next ||
+      next.from !== observed?.from ||
+      !next.query.startsWith(observed?.query ?? '')
+    )
+      dismissed = null
+    observed = next
   }
   function select(index: number) {
     active = index
@@ -104,17 +116,18 @@ export function createSlashMenu(
   }
   document.addEventListener('pointerdown', outside, true)
   document.addEventListener('scroll', scroll, true)
-  window.addEventListener('resize', blur)
+  window.addEventListener('resize', reposition)
   window.addEventListener('blur', blur)
   editor.addEventListener('blur', blur)
   menu.addEventListener('pointerdown', (event) => event.preventDefault())
   const unsubscribeSyntax = context.editor.onSyntaxChange(reposition)
   return {
+    observe,
     update(next: SlashMatch | null) {
       if (destroyed) return
+      observe(next)
       if (!next) {
         match = null
-        dismissed = null
         hide()
         return
       }
@@ -125,11 +138,6 @@ export function createSlashMenu(
         available.length !== results.length ||
         available.some((command, index) => command.id !== results[index]?.id)
       results = available
-      if (
-        next.from !== match?.from ||
-        !next.query.startsWith(match?.query ?? '')
-      )
-        dismissed = null
       match = next
       if (dismissed === next.from) return
       if (next.rect.bottom < 0 || next.rect.top > innerHeight) {
@@ -220,7 +228,7 @@ export function createSlashMenu(
       hide()
       document.removeEventListener('pointerdown', outside, true)
       document.removeEventListener('scroll', scroll, true)
-      window.removeEventListener('resize', blur)
+      window.removeEventListener('resize', reposition)
       window.removeEventListener('blur', blur)
       editor.removeEventListener('blur', blur)
       unsubscribeSyntax()
